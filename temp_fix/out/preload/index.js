@@ -1069,13 +1069,121 @@ const HANDLER_METHODS = Object.fromEntries(
     Object.keys(methods)
   ])
 );
+// Gugu: read-through cache for idempotent IPC reads. Re-opening a profile,
+// game or community is served instantly, and identical concurrent calls
+// share one round trip. Any mutating call flushes the whole cache.
+const GUGU_SEC = 1e3;
+const GUGU_MIN = 60 * GUGU_SEC;
+const GUGU_CACHE_TTL = {
+  "users:getProfile": GUGU_MIN,
+  "users:getBadges": 5 * GUGU_MIN,
+  "users:getBadgeThumbnails": 30 * GUGU_MIN,
+  "users:getCurrentlyWearing": 3 * GUGU_MIN,
+  "users:getSocialCounts": GUGU_MIN,
+  "users:getInventoryVisibility": 5 * GUGU_MIN,
+  "users:getInventoryCategories": 5 * GUGU_MIN,
+  "auth:getFavoriteGames": 2 * GUGU_MIN,
+  "auth:getAvatarHeadshots": 10 * GUGU_MIN,
+  "auth:getUserDetails": 2 * GUGU_MIN,
+  "avatar:getUserAvatar": 3 * GUGU_MIN,
+  "games:getSorts": 10 * GUGU_MIN,
+  "games:getBySort": 3 * GUGU_MIN,
+  "games:getUserGames": 5 * GUGU_MIN,
+  "games:getDetails": 3 * GUGU_MIN,
+  "games:getPlayability": GUGU_MIN,
+  "games:getThumbnails": 30 * GUGU_MIN,
+  "games:getWideThumbnails": 30 * GUGU_MIN,
+  "games:getVotes": 3 * GUGU_MIN,
+  "games:getSocialLinks": 30 * GUGU_MIN,
+  "games:getUniverseByPlace": 60 * GUGU_MIN,
+  "games:getPromotedGames": 5 * GUGU_MIN,
+  "communities:getDetails": 3 * GUGU_MIN,
+  "communities:getMetadata": 10 * GUGU_MIN,
+  "communities:getUserCommunities": 3 * GUGU_MIN,
+  "communities:getIcons": 30 * GUGU_MIN,
+  "communities:getSocialLinks": 30 * GUGU_MIN,
+  "communities:getProfileInfo": 3 * GUGU_MIN,
+  "communities:getGameCommunity": 10 * GUGU_MIN,
+  "catalog:getItemThumbnails": 30 * GUGU_MIN,
+  "catalog:getItemDetails": 3 * GUGU_MIN,
+  "catalog:getNavigationMenu": 30 * GUGU_MIN,
+  "avatar:getAssetThumbnails": 30 * GUGU_MIN,
+  "avatar:getOutfitThumbnails": 30 * GUGU_MIN
+};
+// Results that look incomplete (pending thumbnails, empty urls) only live briefly.
+const GUGU_INCOMPLETE_TTL = 5 * GUGU_SEC;
+const GUGU_CACHE_MAX = 600;
+const GUGU_MUTATION_RE = /^(set|update|create|delete|remove|join|leave|toggle|accept|decline|send|follow|unfollow|unfriend|equip|rename|wear|purchase|checkout|switch|login|logout|redraw|save|overwrite|duplicate|pin|unpin|counter|add|clear|reset|mark|archive|perform)/;
+const GUGU_INVALIDATING_NAMESPACES = /* @__PURE__ */ new Set(["auth", "friends", "users", "games", "communities", "avatar", "catalog", "outfits", "events"]);
+const guguCache = /* @__PURE__ */ new Map();
+const guguIsIncomplete = (value) => {
+  if (value === null || value === void 0) {
+    return true;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  for (const v of Object.values(value)) {
+    if (v === null || v === void 0 || v === "") {
+      return true;
+    }
+    if (v && typeof v === "object" && "state" in v && v.state !== "Completed") {
+      return true;
+    }
+  }
+  return false;
+};
+const guguCachedInvoke = (channel, ttl, args) => {
+  let key;
+  try {
+    key = channel + "|" + JSON.stringify(args);
+  } catch {
+    return electron.ipcRenderer.invoke(channel, ...args);
+  }
+  const now = Date.now();
+  const hit = guguCache.get(key);
+  if (hit && hit.expiresAt > now) {
+    guguCache.delete(key);
+    guguCache.set(key, hit);
+    return hit.promise;
+  }
+  const promise = electron.ipcRenderer.invoke(channel, ...args);
+  const entry = { promise, expiresAt: now + ttl };
+  guguCache.set(key, entry);
+  promise.then(
+    (value) => {
+      if (guguIsIncomplete(value)) {
+        entry.expiresAt = Date.now() + GUGU_INCOMPLETE_TTL;
+      }
+    },
+    () => {
+      if (guguCache.get(key) === entry) {
+        guguCache.delete(key);
+      }
+    }
+  );
+  while (guguCache.size > GUGU_CACHE_MAX) {
+    guguCache.delete(guguCache.keys().next().value);
+  }
+  return promise;
+};
 function createApi() {
   const api2 = {};
   for (const namespace of Object.keys(HANDLER_METHODS)) {
     api2[namespace] = {};
     for (const method of HANDLER_METHODS[namespace]) {
       const channel = `${namespace}:${String(method)}`;
-      api2[namespace][method] = (...args) => electron.ipcRenderer.invoke(channel, ...args);
+      const ttl = GUGU_CACHE_TTL[channel];
+      if (ttl) {
+        api2[namespace][method] = (...args) => guguCachedInvoke(channel, ttl, args);
+      } else if (GUGU_MUTATION_RE.test(String(method)) && GUGU_INVALIDATING_NAMESPACES.has(namespace)) {
+        api2[namespace][method] = (...args) => {
+          guguCache.clear();
+          return electron.ipcRenderer.invoke(channel, ...args);
+        };
+      } else {
+        api2[namespace][method] = (...args) => electron.ipcRenderer.invoke(channel, ...args);
+      }
     }
   }
   return api2;

@@ -17,3 +17,9 @@ build/node_modules/
 temp_fix/node_modules/
 lunar-extracted/
 app-asar/
+
+# Rust / Tauri port
+src-tauri/target/
+src-tauri/gen/
+src-tauri/generated/
+dist-tauri/

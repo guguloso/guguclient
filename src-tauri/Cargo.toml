@@ -1,0 +1,65 @@
+[package]
+name = "gugu-client"
+version = "1.0.16"
+description = "Gugu Client for Roblox — native Rust runtime (Tauri)"
+authors = ["guguloso"]
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+# The `_lib` suffix avoids a name clash with the binary on Windows (cargo#8519).
+name = "gugu_client_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Runtime / UI shell: the existing React renderer runs unchanged in WebView2.
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+
+# Serialization: the IPC contract is JSON, identical to Electron's.
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+
+# Async + concurrency
+tokio = { version = "1", features = ["sync", "time", "fs", "macros"] }
+futures = "0.3"
+parking_lot = "0.12"
+
+# HTTP (Roblox web APIs). rustls avoids an OpenSSL dependency on Windows.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "brotli"] }
+bytes = "1"
+urlencoding = "2"
+
+# Errors and logging
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+
+# Storage, caching, crypto (Electron safeStorage compatible)
+dirs = "6"
+lru = "0.12"
+uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
+base64 = "0.22"
+aes-gcm = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev.package."*"]
+# Dependencies are compiled optimized even in dev so the UI stays snappy.
+opt-level = 2

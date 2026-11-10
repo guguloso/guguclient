@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Gugu Client for Roblox",
+  "version": "1.0.16",
+  "identifier": "com.guguloso.guguclient",
+  "build": {
+    "frontendDist": "../dist-tauri",
+    "beforeDevCommand": "node src-tauri/scripts/prepare-frontend.mjs",
+    "beforeBuildCommand": "node src-tauri/scripts/prepare-frontend.mjs"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    }
+  }
+}

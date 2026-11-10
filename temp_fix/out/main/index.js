@@ -71022,44 +71022,56 @@ let UsersService = class {
       idsForType.add(asset.assetId);
       targetAssetIdsByType.set(assetType, idsForType);
     }
-    for (const [assetType, targetAssetIds] of targetAssetIdsByType) {
-      let cursor;
-      let shouldContinue = true;
-      while (shouldContinue) {
-        const response = await rozod.fetchApi(
-          inventoryv2.getUsersUseridInventoryAssettypeid,
-          {
-            userId,
-            assetTypeId: assetType,
-            limit: 100,
-            sortOrder: "Desc",
-            // Only include cursor when defined to avoid a 400
-            ...cursor ? { cursor } : {}
-          },
-          { throwOnError: true }
-        );
-        for (const item of response.data ?? []) {
-          const assetId = item.assetId ?? 0;
-          if (!targetAssetIds.has(assetId)) {
-            continue;
+    // Gugu: scan every asset type in parallel and cap pagination so huge
+    // inventories (or private ones) never block the profile from loading.
+    const MAX_PAGES_PER_TYPE = 3;
+    await Promise.all(
+      Array.from(targetAssetIdsByType).map(async ([assetType, targetAssetIds]) => {
+        let cursor;
+        let pages = 0;
+        let shouldContinue = true;
+        while (shouldContinue && pages < MAX_PAGES_PER_TYPE) {
+          pages += 1;
+          let response;
+          try {
+            response = await rozod.fetchApi(
+              inventoryv2.getUsersUseridInventoryAssettypeid,
+              {
+                userId,
+                assetTypeId: assetType,
+                limit: 100,
+                sortOrder: "Desc",
+                // Only include cursor when defined to avoid a 400
+                ...cursor ? { cursor } : {}
+              },
+              { throwOnError: true }
+            );
+          } catch {
+            return;
           }
-          const existing = metadataByAssetId.get(assetId);
-          const candidate = {
-            collectibleItemId: item.collectibleItemId ?? void 0,
-            serialNumber: item.serialNumber ?? void 0
-          };
-          const shouldReplace = !existing || candidate.serialNumber !== void 0 && candidate.serialNumber > 0 && existing.serialNumber === void 0;
-          if (shouldReplace) {
-            metadataByAssetId.set(assetId, candidate);
+          for (const item of response.data ?? []) {
+            const assetId = item.assetId ?? 0;
+            if (!targetAssetIds.has(assetId)) {
+              continue;
+            }
+            const existing = metadataByAssetId.get(assetId);
+            const candidate = {
+              collectibleItemId: item.collectibleItemId ?? void 0,
+              serialNumber: item.serialNumber ?? void 0
+            };
+            const shouldReplace = !existing || candidate.serialNumber !== void 0 && candidate.serialNumber > 0 && existing.serialNumber === void 0;
+            if (shouldReplace) {
+              metadataByAssetId.set(assetId, candidate);
+            }
           }
+          const matchedAll = Array.from(targetAssetIds).every(
+            (assetId) => metadataByAssetId.has(assetId)
+          );
+          cursor = response.nextPageCursor ?? void 0;
+          shouldContinue = !matchedAll && cursor !== void 0;
         }
-        const matchedAll = Array.from(targetAssetIds).every(
-          (assetId) => metadataByAssetId.has(assetId)
-        );
-        cursor = response.nextPageCursor ?? void 0;
-        shouldContinue = !matchedAll && cursor !== void 0;
-      }
-    }
+      })
+    );
     return metadataByAssetId;
   }
   /**
