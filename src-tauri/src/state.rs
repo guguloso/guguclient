@@ -47,6 +47,9 @@ pub struct AppState {
     pub catalog: crate::services::catalog::CatalogState,
     pub chat: crate::services::chat::ChatPoller,
     pub user_settings: crate::services::user_settings::UserSettingsService,
+    pub instances: crate::services::instances::InstancesService,
+    pub versions: crate::services::versions::VersionsService,
+    pub launch: crate::services::launch::LaunchService,
 }
 
 impl AppState {
@@ -75,6 +78,9 @@ impl AppState {
             catalog: Default::default(),
             chat: crate::services::chat::ChatPoller::new(),
             user_settings: Default::default(),
+            instances: Default::default(),
+            versions: Default::default(),
+            launch: Default::default(),
             app,
             events,
             roblox,

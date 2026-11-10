@@ -151,6 +151,12 @@ impl RobloxClient {
         Self::decode(url, response).await
     }
 
+    /// POST without a body as a specific account from the website origin
+    /// (authentication tickets). Returns the raw response for its headers.
+    pub async fn post_web_as(&self, url: &str, cookie: &str) -> AppResult<Response> {
+        self.send(Method::POST, url, Some(Bytes::new()), Auth::Web { cookie: Some(cookie), tracker: None }).await
+    }
+
     async fn send(&self, method: Method, url: &str, body: Option<Bytes>, auth: Auth<'_>) -> AppResult<Response> {
         let mut attempt = 0;
         loop {
@@ -163,7 +169,8 @@ impl RobloxClient {
                     ".ROBLOSECURITY={cookie}; RBXEventTrackerV2=browserid={}",
                     urlencoding::encode(tracker)
                 )),
-                Auth::Web { .. } => session(),
+                Auth::Web { cookie: Some(cookie), tracker: None } => Some(format!(".ROBLOSECURITY={cookie}")),
+                Auth::Web { cookie: None, .. } => session(),
             };
             let csrf = if method == Method::GET { None } else { self.csrf.read().clone() };
 

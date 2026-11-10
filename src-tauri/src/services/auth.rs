@@ -285,6 +285,112 @@ impl AuthService {
         self.decrypt(&encrypted)
     }
 
+    /// `getStoredCookie` / `getStoredCookieForUser`.
+    pub fn stored_cookie(&self, user_id: Option<u64>) -> Option<String> {
+        self.cookie_for(user_id.or_else(|| self.current_user_id())?)
+    }
+
+    pub fn has_account(&self, user_id: u64) -> bool {
+        self.data.read().accounts.iter().any(|a| a.user_id == user_id)
+    }
+
+    /// `persistCookieForUser`: stores a rotated `.ROBLOSECURITY`.
+    fn persist_cookie(&self, user_id: u64, cookie: &str) {
+        if self.cookie_for(user_id).as_deref() == Some(cookie) {
+            return;
+        }
+        let Ok(encrypted) = self.crypto.encrypt_base64(cookie) else { return };
+        let result = self.save(|data| {
+            if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
+                account.cookie = encrypted;
+            }
+        });
+        match result {
+            Ok(()) => tracing::info!("Auth: Refreshed .ROBLOSECURITY cookie for user {user_id}"),
+            Err(error) => tracing::warn!(%error, "Auth: failed to persist rotated cookie"),
+        }
+    }
+
+    /// `invalidateAccountWithNotification`.
+    fn invalidate_with_notification(&self, user_id: u64) {
+        let (display_name, was_active) = {
+            let data = self.data.read();
+            let Some(account) = data.accounts.iter().find(|a| a.user_id == user_id) else { return };
+            if account.session_invalid == Some(true) {
+                return;
+            }
+            (account.display_name.clone(), data.active_user_id == Some(user_id))
+        };
+        if was_active {
+            self.roblox.set_cookie(None);
+        }
+        let result = self.save(|data| {
+            mark_invalid(data, user_id, true);
+            if was_active {
+                data.active_user_id = None;
+            }
+        });
+        if let Err(error) = result {
+            tracing::warn!(%error, "Auth: failed to mark session invalid");
+            return;
+        }
+        self.events.emit_main("auth:invalidated", json!({ "userId": user_id, "displayName": display_name }));
+        if was_active {
+            self.notify_active_account_changed(None);
+        }
+    }
+
+    /// `getAuthTicket`: one-time ticket the Roblox client logs in with.
+    pub async fn get_auth_ticket(&self, user_id: Option<u64>) -> AppResult<String> {
+        let target = user_id.or_else(|| self.current_user_id());
+        let cookie = match user_id {
+            Some(id) => self.cookie_for(id).ok_or_else(|| AppError::msg(format!("Pinned account {id} was not found")))?,
+            None => self
+                .stored_cookie(None)
+                .ok_or_else(|| AppError::msg("Not authenticated - cannot generate auth ticket"))?,
+        };
+        let url = format!("{}/authentication-ticket/", endpoints::AUTH_V1);
+        let response = self.roblox.post_web_as(&url, &cookie).await?;
+        let rotated = response
+            .headers()
+            .get_all(reqwest::header::SET_COOKIE)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .find_map(|v| v.split(';').next()?.trim().strip_prefix(".ROBLOSECURITY=").map(str::to_owned))
+            .filter(|c| !c.is_empty() && *c != cookie);
+        if let (Some(target), Some(rotated)) = (target, rotated) {
+            if self.has_account(target) {
+                self.persist_cookie(target, &rotated);
+                if self.current_user_id() == Some(target) {
+                    self.roblox.set_cookie(Some(&rotated));
+                }
+            }
+        }
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            tracing::error!(status = status.as_u16(), body = %body.chars().take(300).collect::<String>(), "Auth ticket request failed!");
+            if status.as_u16() == 401 {
+                if let Some(id) = user_id {
+                    self.invalidate_with_notification(id);
+                }
+                return Err(AppError::msg("Authentication expired - please login again"));
+            }
+            return Err(AppError::msg(format!("Failed to generate auth ticket: {status}")));
+        }
+        let ticket = response
+            .headers()
+            .get("rbx-authentication-ticket")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned)
+            .ok_or_else(|| {
+                tracing::error!("No authentication ticket in response!");
+                AppError::msg("No authentication ticket in response - Roblox API may have changed")
+            })?;
+        tracing::debug!("Successfully generated authentication ticket!");
+        Ok(ticket)
+    }
+
     /// Applies `f` to the auth data and writes `auth.json` once.
     fn save(&self, f: impl FnOnce(&mut AuthFile)) -> AppResult<()> {
         let bytes = {
