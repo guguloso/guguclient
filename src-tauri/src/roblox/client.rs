@@ -29,7 +29,10 @@ enum Auth<'a> {
     /// An explicit account cookie.
     Cookie(&'a str),
     /// Website context; falls back to the session cookie without a tracker.
-    Web { cookie: Option<&'a str>, tracker: Option<&'a str> },
+    Web {
+        cookie: Option<&'a str>,
+        tracker: Option<&'a str>,
+    },
 }
 
 /// Shared, connection-pooled Roblox client. Cheap to share via `Arc`; the
@@ -50,7 +53,11 @@ impl RobloxClient {
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(30))
             .build()?;
-        Ok(Self { http, cookie: RwLock::new(None), csrf: RwLock::new(None) })
+        Ok(Self {
+            http,
+            cookie: RwLock::new(None),
+            csrf: RwLock::new(None),
+        })
     }
 
     /// Raw client for non-API downloads (thumbnail images, etc.).
@@ -74,7 +81,9 @@ impl RobloxClient {
         T: DeserializeOwned,
     {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        let response = self.send(Method::POST, url, Some(bytes), Auth::Session).await?;
+        let response = self
+            .send(Method::POST, url, Some(bytes), Auth::Session)
+            .await?;
         Self::decode(url, response).await
     }
 
@@ -90,7 +99,9 @@ impl RobloxClient {
         T: DeserializeOwned,
     {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        let response = self.send(Method::PATCH, url, Some(bytes), Auth::Session).await?;
+        let response = self
+            .send(Method::PATCH, url, Some(bytes), Auth::Session)
+            .await?;
         Self::decode(url, response).await
     }
 
@@ -102,7 +113,11 @@ impl RobloxClient {
     /// POST with the session cookie; returns only the HTTP status.
     pub async fn post_raw<B: Serialize + ?Sized>(&self, url: &str, body: &B) -> AppResult<u16> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        Ok(self.send(Method::POST, url, Some(bytes), Auth::Session).await?.status().as_u16())
+        Ok(self
+            .send(Method::POST, url, Some(bytes), Auth::Session)
+            .await?
+            .status()
+            .as_u16())
     }
 
     /// GET with the session cookie, returning the raw response (status-aware callers).
@@ -113,12 +128,19 @@ impl RobloxClient {
     /// Like [`get`](Self::get) but authenticates with an explicit cookie
     /// (account validation, multi-account operations).
     pub async fn get_as(&self, url: &str, cookie: &str) -> AppResult<Response> {
-        self.send(Method::GET, url, None, Auth::Cookie(cookie)).await
+        self.send(Method::GET, url, None, Auth::Cookie(cookie))
+            .await
     }
 
-    pub async fn post_as<B: Serialize + ?Sized>(&self, url: &str, body: &B, cookie: &str) -> AppResult<Response> {
+    pub async fn post_as<B: Serialize + ?Sized>(
+        &self,
+        url: &str,
+        body: &B,
+        cookie: &str,
+    ) -> AppResult<Response> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        self.send(Method::POST, url, Some(bytes), Auth::Cookie(cookie)).await
+        self.send(Method::POST, url, Some(bytes), Auth::Cookie(cookie))
+            .await
     }
 
     pub async fn decode<T: DeserializeOwned>(url: &str, response: Response) -> AppResult<T> {
@@ -126,7 +148,11 @@ impl RobloxClient {
         if !status.is_success() {
             let mut message = response.text().await.unwrap_or_default();
             message.truncate(ERROR_BODY_LIMIT);
-            return Err(AppError::Api { status: status.as_u16(), url: url.to_owned(), message });
+            return Err(AppError::Api {
+                status: status.as_u16(),
+                url: url.to_owned(),
+                message,
+            });
         }
         // Some endpoints answer 200 with an empty body; treat it as `null`.
         let bytes = response.bytes().await?;
@@ -150,8 +176,14 @@ impl RobloxClient {
     ) -> AppResult<T> {
         let bytes = body.map(serde_json::to_vec).transpose()?.map(Bytes::from);
         let auth = match context {
-            Some((cookie, tracker)) => Auth::Web { cookie: Some(cookie), tracker: Some(tracker) },
-            None => Auth::Web { cookie: None, tracker: None },
+            Some((cookie, tracker)) => Auth::Web {
+                cookie: Some(cookie),
+                tracker: Some(tracker),
+            },
+            None => Auth::Web {
+                cookie: None,
+                tracker: None,
+            },
         };
         let response = self.send(method, url, bytes, auth).await?;
         Self::decode(url, response).await
@@ -160,30 +192,71 @@ impl RobloxClient {
     /// POST without a body as a specific account from the website origin
     /// (authentication tickets). Returns the raw response for its headers.
     pub async fn post_web_as(&self, url: &str, cookie: &str) -> AppResult<Response> {
-        self.send(Method::POST, url, Some(Bytes::new()), Auth::Web { cookie: Some(cookie), tracker: None }).await
+        self.send(
+            Method::POST,
+            url,
+            Some(Bytes::new()),
+            Auth::Web {
+                cookie: Some(cookie),
+                tracker: None,
+            },
+        )
+        .await
     }
 
-    async fn send(&self, method: Method, url: &str, body: Option<Bytes>, auth: Auth<'_>) -> AppResult<Response> {
+    async fn send(
+        &self,
+        method: Method,
+        url: &str,
+        body: Option<Bytes>,
+        auth: Auth<'_>,
+    ) -> AppResult<Response> {
         let mut attempt = 0;
         loop {
             attempt += 1;
-            let session = || self.cookie.read().as_deref().map(|c| format!(".ROBLOSECURITY={c}"));
+            let session = || {
+                self.cookie
+                    .read()
+                    .as_deref()
+                    .map(|c| format!(".ROBLOSECURITY={c}"))
+            };
             let cookie_header = match auth {
                 Auth::Session => session(),
                 Auth::Cookie(cookie) => Some(format!(".ROBLOSECURITY={cookie}")),
-                Auth::Web { cookie: Some(cookie), tracker: Some(tracker) } => Some(format!(
+                Auth::Web {
+                    cookie: Some(cookie),
+                    tracker: Some(tracker),
+                } => Some(format!(
                     ".ROBLOSECURITY={cookie}; RBXEventTrackerV2=browserid={}",
                     urlencoding::encode(tracker)
                 )),
-                Auth::Web { cookie: Some(cookie), tracker: None } => Some(format!(".ROBLOSECURITY={cookie}")),
+                Auth::Web {
+                    cookie: Some(cookie),
+                    tracker: None,
+                } => Some(format!(".ROBLOSECURITY={cookie}")),
                 Auth::Web { cookie: None, .. } => session(),
             };
-            let csrf = if method == Method::GET { None } else { self.csrf.read().clone() };
+            let csrf = if method == Method::GET {
+                None
+            } else {
+                self.csrf.read().clone()
+            };
 
             let mut request = self.http.request(method.clone(), url);
             if let Auth::Web { tracker, .. } = auth {
-                request = request.header("Origin", endpoints::WEB).header("Referer", WEB_REFERER);
-                if let (Some(tracker), true) = (tracker, matches!(auth, Auth::Web { cookie: Some(_), .. })) {
+                request = request
+                    .header("Origin", endpoints::WEB)
+                    .header("Referer", WEB_REFERER);
+                if let (Some(tracker), true) = (
+                    tracker,
+                    matches!(
+                        auth,
+                        Auth::Web {
+                            cookie: Some(_),
+                            ..
+                        }
+                    ),
+                ) {
                     request = request.header("Roblox-Browser-Tracker", tracker);
                 }
             }
@@ -195,7 +268,9 @@ impl RobloxClient {
             }
             if let Some(bytes) = &body {
                 // `Bytes` clones are reference-counted: replays don't copy the body.
-                request = request.header(CONTENT_TYPE, "application/json").body(bytes.clone());
+                request = request
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(bytes.clone());
             }
 
             let response = request.send().await?;

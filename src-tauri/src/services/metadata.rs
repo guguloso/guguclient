@@ -49,7 +49,11 @@ impl LunarApi {
         Ok(Self { http })
     }
 
-    pub async fn get<T: DeserializeOwned>(&self, path: &str, query: &[(&str, &str)]) -> AppResult<T> {
+    pub async fn get<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &[(&str, &str)],
+    ) -> AppResult<T> {
         let url = format!("{PROD_API_URL}{path}");
         let result = async {
             let response = self
@@ -62,7 +66,11 @@ impl LunarApi {
                 .await?;
             let status = response.status();
             if !status.is_success() {
-                return Err(AppError::Api { status: status.as_u16(), url: url.clone(), message: status.to_string() });
+                return Err(AppError::Api {
+                    status: status.as_u16(),
+                    url: url.clone(),
+                    message: status.to_string(),
+                });
             }
             Ok(response.json::<T>().await?)
         }
@@ -126,7 +134,9 @@ fn installation_id(base: &Path) -> &'static str {
             return id;
         }
         let generated = uuid::Uuid::new_v4().to_string();
-        if let Err(error) = std::fs::create_dir_all(base).and_then(|()| std::fs::write(&path, &generated)) {
+        if let Err(error) =
+            std::fs::create_dir_all(base).and_then(|()| std::fs::write(&path, &generated))
+        {
             tracing::error!("[InstallationId] Failed to persist: {error}");
         }
         tracing::info!("[InstallationId] Generated: {generated}");
@@ -136,7 +146,10 @@ fn installation_id(base: &Path) -> &'static str {
 
 /// `getGatedInstallationId`: the real id only for verified 13+ accounts.
 pub fn gated_installation_id(state: &AppState) -> String {
-    let verified = state.auth.current_user_id().is_some_and(|id| state.auth.is_user_above13(id));
+    let verified = state
+        .auth
+        .current_user_id()
+        .is_some_and(|id| state.auth.is_user_above13(id));
     if verified {
         installation_id(&state.paths.base).to_owned()
     } else {
@@ -161,7 +174,11 @@ fn pending_ids(items: &[Value]) -> HashSet<String> {
 }
 
 fn pending_items(items: &[Value]) -> Vec<Value> {
-    items.iter().filter(|i| i.get("newVersion").is_some()).cloned().collect()
+    items
+        .iter()
+        .filter(|i| i.get("newVersion").is_some())
+        .cloned()
+        .collect()
 }
 
 fn stored_version(stored: &Value) -> Value {
@@ -221,7 +238,10 @@ impl MetadataService {
             last_channel: Mutex::new(None),
             interval_ms: AtomicU64::new(DEFAULT_METADATA_INTERVAL_MS),
             interval_changed: Notify::new(),
-            carousel: TtlCache { slot: tokio::sync::Mutex::new(None), ttl: CAROUSEL_SLIDES_TTL },
+            carousel: TtlCache {
+                slot: tokio::sync::Mutex::new(None),
+                ttl: CAROUSEL_SLIDES_TTL,
+            },
             terms: Mutex::new(TermsState::default()),
         })
     }
@@ -257,7 +277,8 @@ impl MetadataService {
         let state = Arc::clone(state);
         tauri::async_runtime::spawn(async move {
             loop {
-                let interval = Duration::from_millis(state.metadata.interval_ms.load(Ordering::Acquire));
+                let interval =
+                    Duration::from_millis(state.metadata.interval_ms.load(Ordering::Acquire));
                 tokio::select! {
                     _ = tokio::time::sleep(interval) => {
                         tracing::info!("[Metadata] Fetching metadata (interval refresh)");
@@ -275,7 +296,9 @@ impl MetadataService {
     fn reschedule_if_needed(&self, server_ms: u64) {
         let current = self.interval_ms.load(Ordering::Acquire);
         if server_ms > 0 && server_ms != current {
-            tracing::info!("[Metadata] Server changed refresh interval: {current}ms → {server_ms}ms");
+            tracing::info!(
+                "[Metadata] Server changed refresh interval: {current}ms → {server_ms}ms"
+            );
             self.interval_ms.store(server_ms, Ordering::Release);
             self.interval_changed.notify_waiters();
         }
@@ -292,7 +315,9 @@ pub async fn fetch_metadata(state: &AppState, switch_to: Option<&str>) -> Option
     let metadata = &state.metadata;
     let request_id = metadata.latest_request.fetch_add(1, Ordering::AcqRel) + 1;
     let installation_id = gated_installation_id(state);
-    let stream = switch_to.filter(|s| !s.is_empty()).unwrap_or(BUILD_UPDATER_CHANNEL);
+    let stream = switch_to
+        .filter(|s| !s.is_empty())
+        .unwrap_or(BUILD_UPDATER_CHANNEL);
     let roblox_id = state.auth.current_user_id();
     let player_id = roblox_id.map(|id| id.to_string());
 
@@ -311,7 +336,8 @@ pub async fn fetch_metadata(state: &AppState, switch_to: Option<&str>) -> Option
             return None;
         }
     };
-    if installation_id != gated_installation_id(state) || roblox_id != state.auth.current_user_id() {
+    if installation_id != gated_installation_id(state) || roblox_id != state.auth.current_user_id()
+    {
         tracing::info!("[Metadata] Discarding metadata for a superseded account");
         return None;
     }
@@ -322,7 +348,11 @@ pub async fn fetch_metadata(state: &AppState, switch_to: Option<&str>) -> Option
 
     process_updater(state, &response.updater.channel);
     process_incoming_terms(state, &response.terms);
-    state.feature_flags.process_incoming(response.feature_flags.as_ref(), &state.cache, &state.events);
+    state.feature_flags.process_incoming(
+        response.feature_flags.as_ref(),
+        &state.cache,
+        &state.events,
+    );
     metadata.reschedule_if_needed(response.refresh_intervals.metadata);
     Some(response.updater.channel)
 }
@@ -349,16 +379,25 @@ fn process_incoming_terms(state: &AppState, documents: &[TermsDocument]) {
     terms.items = documents.iter().map(|doc| reconcile(state, doc)).collect();
     if !terms.reconciled_once {
         terms.reconciled_once = true;
-        let fresh_install = !state.cache.top_level_keys_at_startup().iter().any(|k| k == "terms");
+        let fresh_install = !state
+            .cache
+            .top_level_keys_at_startup()
+            .iter()
+            .any(|k| k == "terms");
         let pending = pending_items(&terms.items);
         if fresh_install && !pending.is_empty() {
-            tracing::info!("[LunarTerms] Fresh install detected, silently accepting {} term(s)", pending.len());
+            tracing::info!(
+                "[LunarTerms] Fresh install detected, silently accepting {} term(s)",
+                pending.len()
+            );
             accept_pending(state, &mut terms, "automatic", &pending);
             return;
         }
     }
     if previous != pending_ids(&terms.items) {
-        state.events.emit_main(TERMS_PENDING_CHANGED, pending_items(&terms.items));
+        state
+            .events
+            .emit_main(TERMS_PENDING_CHANGED, pending_items(&terms.items));
     }
 }
 
@@ -370,12 +409,19 @@ fn accept_pending(state: &AppState, terms: &mut TermsState, initiator: &str, pen
     let accepted_at = now_iso();
     let mut accepted = HashSet::new();
     for item in pending {
-        let (Some(id), Some(next)) = (item.get("id").and_then(Value::as_str), item.get("newVersion")) else { continue };
+        let (Some(id), Some(next)) = (
+            item.get("id").and_then(Value::as_str),
+            item.get("newVersion"),
+        ) else {
+            continue;
+        };
         let record = json!({ "acceptedAt": accepted_at, "hash": next.get("hash"), "updatedAt": next.get("updatedAt") });
         if let Err(error) = state.cache.set(&format!("terms.{id}"), record) {
             tracing::warn!(%error, "[LunarTerms] failed to persist acceptance");
         }
-        let previous = item.get("currentVersion").filter(|p| p.get("acceptedAt").is_some_and(|a| !a.is_null()));
+        let previous = item
+            .get("currentVersion")
+            .filter(|p| p.get("acceptedAt").is_some_and(|a| !a.is_null()));
         let mut payload = json!({
             "id": id,
             "initiator": initiator,
@@ -392,16 +438,20 @@ fn accept_pending(state: &AppState, terms: &mut TermsState, initiator: &str, pen
         accepted.insert(id.to_owned());
     }
     for item in &mut terms.items {
-        let is_accepted = item.get("id").and_then(Value::as_str).is_some_and(|id| accepted.contains(id));
+        let is_accepted = item
+            .get("id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| accepted.contains(id));
         if !is_accepted {
             continue;
         }
         if let Some(next) = item.as_object_mut().and_then(|m| m.remove("newVersion")) {
-            item["currentVersion"] =
-                json!({ "acceptedAt": accepted_at, "hash": next.get("hash"), "updatedAt": next.get("updatedAt") });
+            item["currentVersion"] = json!({ "acceptedAt": accepted_at, "hash": next.get("hash"), "updatedAt": next.get("updatedAt") });
         }
     }
-    state.events.emit_main(TERMS_PENDING_CHANGED, pending_items(&terms.items));
+    state
+        .events
+        .emit_main(TERMS_PENDING_CHANGED, pending_items(&terms.items));
 }
 
 async fn carousel_slides(state: &AppState, force_refresh: bool) -> AppResult<Value> {
@@ -415,11 +465,21 @@ async fn carousel_slides(state: &AppState, force_refresh: bool) -> AppResult<Val
         }
     }
     let installation_id = gated_installation_id(state);
-    let query = [("installation_id", installation_id.as_str()), ("version", APP_VERSION)];
-    let result: AppResult<Value> = state.metadata.api.get("/v1/metadata/carousel", &query).await;
+    let query = [
+        ("installation_id", installation_id.as_str()),
+        ("version", APP_VERSION),
+    ];
+    let result: AppResult<Value> = state
+        .metadata
+        .api
+        .get("/v1/metadata/carousel", &query)
+        .await;
     match result {
         Ok(mut response) => {
-            let slides = response.get_mut("slides").map(Value::take).unwrap_or(Value::Null);
+            let slides = response
+                .get_mut("slides")
+                .map(Value::take)
+                .unwrap_or(Value::Null);
             *slot = Some((Instant::now(), slides.clone()));
             Ok(slides)
         }
@@ -436,7 +496,9 @@ pub fn register(router: &mut Router) {
             let force: Option<bool> = args.opt(0)?;
             carousel_slides(&ctx.state, force.unwrap_or(false)).await
         })
-        .handle("lunarTerms:getPending", |ctx, _| async move { Ok(ctx.state.metadata.pending_terms()) })
+        .handle("lunarTerms:getPending", |ctx, _| async move {
+            Ok(ctx.state.metadata.pending_terms())
+        })
         .handle("lunarTerms:accept", |ctx, _| async move {
             let state = &ctx.state;
             let mut terms = state.metadata.terms.lock();
@@ -447,7 +509,9 @@ pub fn register(router: &mut Router) {
         .handle("updater:switchStream", |ctx, args| async move {
             let stream: String = args.get(0)?;
             tracing::info!("[Metadata] Switching stream to '{stream}'");
-            Ok(fetch_metadata(&ctx.state, Some(&stream)).await.unwrap_or(stream))
+            Ok(fetch_metadata(&ctx.state, Some(&stream))
+                .await
+                .unwrap_or(stream))
         });
 }
 

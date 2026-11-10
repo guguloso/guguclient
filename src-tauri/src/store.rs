@@ -28,7 +28,10 @@ impl JsonStore {
             .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
             .filter(Value::is_object)
             .unwrap_or_else(|| Value::Object(Map::new()));
-        Ok(Self { path, data: RwLock::new(data) })
+        Ok(Self {
+            path,
+            data: RwLock::new(data),
+        })
     }
 
     /// Runs `f` against the value at `key` without cloning the tree.
@@ -39,7 +42,11 @@ impl JsonStore {
 
     /// Keys of the root object, in file order.
     pub fn top_level_keys(&self) -> Vec<String> {
-        self.data.read().as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default()
+        self.data
+            .read()
+            .as_object()
+            .map(|m| m.keys().cloned().collect())
+            .unwrap_or_default()
     }
 
     /// Mutates the whole document under the write lock, then persists once.
@@ -83,7 +90,9 @@ pub fn assign(root: &mut Value, key: &str, value: Value) {
             map.insert(part.to_owned(), value);
             return;
         }
-        node = map.entry(part.to_owned()).or_insert_with(|| Value::Object(Map::new()));
+        node = map
+            .entry(part.to_owned())
+            .or_insert_with(|| Value::Object(Map::new()));
     }
 }
 
@@ -104,7 +113,8 @@ pub fn remove(root: &mut Value, key: &str) {
 }
 
 fn lookup_mut<'a>(root: &'a mut Value, key: &str) -> Option<&'a mut Value> {
-    key.split('.').try_fold(root, |node, part| node.get_mut(part))
+    key.split('.')
+        .try_fold(root, |node, part| node.get_mut(part))
 }
 
 fn serialize(value: &Value) -> AppResult<Vec<u8>> {

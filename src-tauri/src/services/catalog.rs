@@ -71,13 +71,19 @@ pub struct CatalogState {
 // ------------------------------------------------------------------ mapping
 
 fn enum_names(raw: Option<&Value>, names: &[(u64, &str)]) -> Value {
-    let list = raw.and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
+    let list = raw
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
     Value::Array(
         list.iter()
             .filter_map(|v| match v {
                 Value::Number(n) => {
                     let n = n.as_u64()?;
-                    names.iter().find(|(k, _)| *k == n).map(|(_, name)| Value::from(*name))
+                    names
+                        .iter()
+                        .find(|(k, _)| *k == n)
+                        .map(|(_, name)| Value::from(*name))
                 }
                 Value::String(s) => Some(Value::String(s.clone())),
                 _ => None,
@@ -87,11 +93,17 @@ fn enum_names(raw: Option<&Value>, names: &[(u64, &str)]) -> Value {
 }
 
 fn or_null(raw: &Value, key: &str) -> Value {
-    raw.get(key).cloned().filter(|v| !v.is_null()).unwrap_or(Value::Null)
+    raw.get(key)
+        .cloned()
+        .filter(|v| !v.is_null())
+        .unwrap_or(Value::Null)
 }
 
 fn or_default(raw: &Value, key: &str, default: Value) -> Value {
-    raw.get(key).cloned().filter(|v| !v.is_null()).unwrap_or(default)
+    raw.get(key)
+        .cloned()
+        .filter(|v| !v.is_null())
+        .unwrap_or(default)
 }
 
 /// Fields shared by `toCatalogItem` and `toCatalogItemFromItemDetails`.
@@ -103,26 +115,58 @@ fn base_item(raw: &Value) -> Map<String, Value> {
         item.insert(k.to_owned(), v);
     };
     put("id", raw.get("id").cloned().unwrap_or(Value::Null));
-    put("itemType", Value::from(if is_bundle { "Bundle" } else { "Asset" }));
+    put(
+        "itemType",
+        Value::from(if is_bundle { "Bundle" } else { "Asset" }),
+    );
     put("assetType", or_null(raw, "assetType"));
     put("bundleType", or_null(raw, "bundleType"));
     put("name", or_default(raw, "name", json!("")));
     put("description", or_default(raw, "description", json!("")));
     put("productId", or_null(raw, "productId"));
     put("collectibleItemId", or_null(raw, "collectibleItemId"));
-    put("creatorType", Value::from(if is_group { "Group" } else { "User" }));
-    put("creatorTargetId", or_default(raw, "creatorTargetId", json!(0)));
+    put(
+        "creatorType",
+        Value::from(if is_group { "Group" } else { "User" }),
+    );
+    put(
+        "creatorTargetId",
+        or_default(raw, "creatorTargetId", json!(0)),
+    );
     put("creatorName", or_default(raw, "creatorName", json!("")));
-    put("creatorHasVerifiedBadge", Value::Bool(raw.get("creatorHasVerifiedBadge").and_then(Value::as_bool).unwrap_or(false)));
+    put(
+        "creatorHasVerifiedBadge",
+        Value::Bool(
+            raw.get("creatorHasVerifiedBadge")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        ),
+    );
     put("price", or_null(raw, "price"));
     put("lowestPrice", or_null(raw, "lowestPrice"));
     put("lowestResalePrice", or_null(raw, "lowestResalePrice"));
     put("favoriteCount", or_default(raw, "favoriteCount", json!(0)));
-    put("unitsAvailableForConsumption", or_null(raw, "unitsAvailableForConsumption"));
+    put(
+        "unitsAvailableForConsumption",
+        or_null(raw, "unitsAvailableForConsumption"),
+    );
     put("totalQuantity", or_null(raw, "totalQuantity"));
-    put("itemRestrictions", enum_names(raw.get("itemRestrictions"), &ITEM_RESTRICTIONS));
-    put("itemStatus", enum_names(raw.get("itemStatus"), &ITEM_STATUSES));
-    put("hasResellers", Value::Bool(raw.get("hasResellers").and_then(Value::as_bool).unwrap_or(false)));
+    put(
+        "itemRestrictions",
+        enum_names(raw.get("itemRestrictions"), &ITEM_RESTRICTIONS),
+    );
+    put(
+        "itemStatus",
+        enum_names(raw.get("itemStatus"), &ITEM_STATUSES),
+    );
+    put(
+        "hasResellers",
+        Value::Bool(
+            raw.get("hasResellers")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        ),
+    );
     put("saleLocationType", or_null(raw, "saleLocationType"));
     put("offSaleDeadline", or_null(raw, "offSaleDeadline"));
     put("taxonomy", or_default(raw, "taxonomy", json!([])));
@@ -159,13 +203,21 @@ fn to_catalog_item_from_details(raw: &Value) -> Value {
 }
 
 fn apply_collectible(mut item: Value, collectibles: Option<&HashMap<String, Value>>) -> Value {
-    let (Some(id), Some(collectibles)) = (item.get("collectibleItemId").and_then(Value::as_str).map(str::to_owned), collectibles)
-    else {
+    let (Some(id), Some(collectibles)) = (
+        item.get("collectibleItemId")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        collectibles,
+    ) else {
         return item;
     };
     let detail = collectibles.get(&id);
-    item["collectibleProductId"] = detail.map(|d| or_null(d, "collectibleProductId")).unwrap_or(Value::Null);
-    item["resaleRestriction"] = detail.map(|d| or_null(d, "resaleRestriction")).unwrap_or(Value::Null);
+    item["collectibleProductId"] = detail
+        .map(|d| or_null(d, "collectibleProductId"))
+        .unwrap_or(Value::Null);
+    item["resaleRestriction"] = detail
+        .map(|d| or_null(d, "resaleRestriction"))
+        .unwrap_or(Value::Null);
     item
 }
 
@@ -238,7 +290,10 @@ fn to_navigation_menu(raw: &Value) -> Value {
 async fn navigation_menu(ctx: &Ctx, force: bool) -> AppResult<Value> {
     let mut slot = ctx.state.catalog.navigation.lock().await;
     if !force {
-        if let Some((_, menu)) = slot.as_ref().filter(|(at, _)| at.elapsed() < NAVIGATION_TTL) {
+        if let Some((_, menu)) = slot
+            .as_ref()
+            .filter(|(at, _)| at.elapsed() < NAVIGATION_TTL)
+        {
             return Ok(menu.clone());
         }
     }
@@ -296,23 +351,44 @@ async fn search_items(ctx: &Ctx, q: SearchQuery) -> AppResult<Value> {
     };
     push("Keyword", q.keyword.clone());
     push("Taxonomy", q.taxonomy.clone().filter(|t| !t.is_empty()));
-    push("CategoryFilter", q.category_filter.as_ref().and_then(scalar));
+    push(
+        "CategoryFilter",
+        q.category_filter.as_ref().and_then(scalar),
+    );
     push("Subcategory", q.subcategory_id.as_ref().and_then(scalar));
     push("SortType", q.sort_type.as_ref().and_then(scalar));
-    push("SortAggregation", q.sort_aggregation.as_ref().and_then(scalar));
+    push(
+        "SortAggregation",
+        q.sort_aggregation.as_ref().and_then(scalar),
+    );
     push("MinPrice", q.min_price.as_ref().and_then(scalar));
     push("MaxPrice", q.max_price.as_ref().and_then(scalar));
-    push("SalesTypeFilter", q.sales_type_filter.as_ref().and_then(scalar));
+    push(
+        "SalesTypeFilter",
+        q.sales_type_filter.as_ref().and_then(scalar),
+    );
     push("CreatorType", q.creator_type.as_ref().and_then(scalar));
-    push("CreatorTargetId", q.creator_target_id.as_ref().and_then(scalar));
-    push("CreatorName", normalize_creator_name(q.creator_name.as_deref()));
-    push("IncludeNotForSale", q.include_not_for_sale.as_ref().and_then(scalar));
+    push(
+        "CreatorTargetId",
+        q.creator_target_id.as_ref().and_then(scalar),
+    );
+    push(
+        "CreatorName",
+        normalize_creator_name(q.creator_name.as_deref()),
+    );
+    push(
+        "IncludeNotForSale",
+        q.include_not_for_sale.as_ref().and_then(scalar),
+    );
     if q.topics.is_some() {
         push("TriggeredByTopicDiscovery", Some("true".into()));
     }
     push("limit", Some(limit.to_string()));
     push("cursor", q.cursor.clone().filter(|c| !c.is_empty()));
-    for (name, ids) in [("AssetTypeIds", &q.asset_type_ids), ("BundleTypeIds", &q.bundle_type_ids)] {
+    for (name, ids) in [
+        ("AssetTypeIds", &q.asset_type_ids),
+        ("BundleTypeIds", &q.bundle_type_ids),
+    ] {
         for id in ids.iter().flatten() {
             params.push((name, id.to_string()));
         }
@@ -320,11 +396,21 @@ async fn search_items(ctx: &Ctx, q: SearchQuery) -> AppResult<Value> {
     for topic in q.topics.iter().flatten() {
         params.push(("Topics", topic.clone()));
     }
-    let query: Vec<String> = params.iter().map(|(k, v)| format!("{k}={}", urlencoding::encode(v))).collect();
-    let url = format!("{}/search/items/details?{}", endpoints::CATALOG_V2, query.join("&"));
+    let query: Vec<String> = params
+        .iter()
+        .map(|(k, v)| format!("{k}={}", urlencoding::encode(v)))
+        .collect();
+    let url = format!(
+        "{}/search/items/details?{}",
+        endpoints::CATALOG_V2,
+        query.join("&")
+    );
     let raw: Value = ctx.state.roblox.get(&url).await?;
-    let items: Vec<Value> =
-        raw.get("data").and_then(Value::as_array).map(|d| d.iter().map(to_catalog_item).collect()).unwrap_or_default();
+    let items: Vec<Value> = raw
+        .get("data")
+        .and_then(Value::as_array)
+        .map(|d| d.iter().map(to_catalog_item).collect())
+        .unwrap_or_default();
     Ok(json!({
         "keyword": or_null(&raw, "keyword"),
         "previousPageCursor": or_null(&raw, "previousPageCursor"),
@@ -335,11 +421,19 @@ async fn search_items(ctx: &Ctx, q: SearchQuery) -> AppResult<Value> {
 
 /// `lookupItemsDetails` through the 5-minute item details cache.
 async fn items_details(state: &AppState, items: &[ItemRef], strict: bool) -> AppResult<Vec<Value>> {
-    Ok(raw_items_details(state, items, strict).await?.iter().map(to_catalog_item).collect())
+    Ok(raw_items_details(state, items, strict)
+        .await?
+        .iter()
+        .map(to_catalog_item)
+        .collect())
 }
 
 /// `itemDetailsCache.batchFetch` + `postCatalogItemsDetails`: raw entries.
-pub async fn raw_items_details(state: &AppState, items: &[ItemRef], strict: bool) -> AppResult<Vec<Value>> {
+pub async fn raw_items_details(
+    state: &AppState,
+    items: &[ItemRef],
+    strict: bool,
+) -> AppResult<Vec<Value>> {
     if items.is_empty() {
         return Ok(Vec::new());
     }
@@ -353,7 +447,10 @@ pub async fn raw_items_details(state: &AppState, items: &[ItemRef], strict: bool
             if !seen.insert(key.clone()) {
                 continue;
             }
-            match cache.get(&key).filter(|(at, _)| at.elapsed() < ITEM_DETAILS_TTL) {
+            match cache
+                .get(&key)
+                .filter(|(at, _)| at.elapsed() < ITEM_DETAILS_TTL)
+            {
                 Some((_, v)) => result.push((key, v.clone())),
                 None => missing.push(item.clone()),
             }
@@ -365,12 +462,28 @@ pub async fn raw_items_details(state: &AppState, items: &[ItemRef], strict: bool
         match state.roblox.post::<_, Value>(&url, &body).await {
             Ok(raw) => {
                 let mut cache = state.catalog.item_details.lock();
-                for entry in raw.get("data").and_then(Value::as_array).into_iter().flatten() {
-                    let Some(id) = entry.get("id").and_then(Value::as_u64).filter(|id| *id > 0) else { continue };
-                    let kind = if entry.get("itemType").and_then(Value::as_str) == Some("Bundle") { "Bundle" } else { "Asset" };
+                for entry in raw
+                    .get("data")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                {
+                    let Some(id) = entry.get("id").and_then(Value::as_u64).filter(|id| *id > 0)
+                    else {
+                        continue;
+                    };
+                    let kind = if entry.get("itemType").and_then(Value::as_str) == Some("Bundle") {
+                        "Bundle"
+                    } else {
+                        "Asset"
+                    };
                     let key = format!("{kind}:{id}");
                     if cache.len() >= ITEM_DETAILS_MAX {
-                        if let Some(oldest) = cache.iter().min_by_key(|(_, (at, _))| *at).map(|(k, _)| k.clone()) {
+                        if let Some(oldest) = cache
+                            .iter()
+                            .min_by_key(|(_, (at, _))| *at)
+                            .map(|(k, _)| k.clone())
+                        {
                             cache.remove(&oldest);
                         }
                     }
@@ -397,7 +510,12 @@ enum Lookup {
 
 /// `fetchItemDetailsBase`: one item, distinguishing "gone" from "failed".
 async fn item_details_base(state: &AppState, item: &ItemRef) -> Lookup {
-    let url = format!("{}/catalog/items/{}/details?itemType={}", endpoints::CATALOG_V1, item.id, item.item_type);
+    let url = format!(
+        "{}/catalog/items/{}/details?itemType={}",
+        endpoints::CATALOG_V1,
+        item.id,
+        item.item_type
+    );
     let response = match state.roblox.get_raw(&url).await {
         Ok(response) => response,
         Err(error) => {
@@ -417,7 +535,13 @@ async fn item_details_base(state: &AppState, item: &ItemRef) -> Lookup {
     }
     let body: Value = response.json().await.unwrap_or(Value::Null);
     let code = body.pointer("/errors/0/code").and_then(Value::as_u64);
-    tracing::warn!(status, ?code, "Catalog item details for {} {} were refused", item.item_type, item.id);
+    tracing::warn!(
+        status,
+        ?code,
+        "Catalog item details for {} {} were refused",
+        item.item_type,
+        item.id
+    );
     if status == 404 || (status == 400 && matches!(code, Some(11) | Some(21))) {
         Lookup::NotFound
     } else {
@@ -453,8 +577,14 @@ async fn collectible_details(state: &AppState, ids: Vec<String>) -> Option<HashM
 }
 
 async fn item_details(state: &AppState, item: ItemRef) -> Option<Value> {
-    let Lookup::Found(found) = item_details_base(state, &item).await else { return None };
-    let Some(collectible) = found.get("collectibleItemId").and_then(Value::as_str).map(str::to_owned) else {
+    let Lookup::Found(found) = item_details_base(state, &item).await else {
+        return None;
+    };
+    let Some(collectible) = found
+        .get("collectibleItemId")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+    else {
         return Some(found);
     };
     let collectibles = collectible_details(state, vec![collectible]).await;
@@ -464,8 +594,11 @@ async fn item_details(state: &AppState, item: ItemRef) -> Option<Value> {
 /// `getItemsDetailsRich`: up to 30 unique items, 4 at a time.
 async fn items_details_rich(state: &AppState, items: Vec<ItemRef>) -> Vec<Value> {
     let mut seen = HashSet::new();
-    let refs: Vec<ItemRef> =
-        items.into_iter().filter(|i| seen.insert(i.key())).take(RICH_DETAILS_MAX_ITEMS).collect();
+    let refs: Vec<ItemRef> = items
+        .into_iter()
+        .filter(|i| seen.insert(i.key()))
+        .take(RICH_DETAILS_MAX_ITEMS)
+        .collect();
     if refs.is_empty() {
         return Vec::new();
     }
@@ -478,33 +611,80 @@ async fn items_details_rich(state: &AppState, items: Vec<ItemRef>) -> Vec<Value>
             }
         }
     }
-    let ids = details.iter().filter_map(|d| d.get("collectibleItemId").and_then(Value::as_str).map(str::to_owned)).collect();
+    let ids = details
+        .iter()
+        .filter_map(|d| {
+            d.get("collectibleItemId")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect();
     let collectibles = collectible_details(state, ids).await;
     if state.auth.current_user_id() != user_id {
         tracing::warn!("Account changed while fetching rich item details; discarding them");
         return Vec::new();
     }
     match collectibles {
-        Some(c) => details.into_iter().map(|d| apply_collectible(d, Some(&c))).collect(),
-        None => details.into_iter().filter(|d| d.get("collectibleItemId").is_none_or(Value::is_null)).collect(),
+        Some(c) => details
+            .into_iter()
+            .map(|d| apply_collectible(d, Some(&c)))
+            .collect(),
+        None => details
+            .into_iter()
+            .filter(|d| d.get("collectibleItemId").is_none_or(Value::is_null))
+            .collect(),
     }
 }
 
-async fn item_thumbnails(ctx: &Ctx, items: Vec<ItemRef>, size: String) -> AppResult<BTreeMap<String, String>> {
-    let assets: Vec<u64> = items.iter().filter(|i| !i.is_bundle()).map(|i| i.id).collect();
-    let bundles: Vec<u64> = items.iter().filter(|i| i.is_bundle()).map(|i| i.id).collect();
-    let bundle_size = if size == "150x150" { "150x150" } else { "420x420" };
+async fn item_thumbnails(
+    ctx: &Ctx,
+    items: Vec<ItemRef>,
+    size: String,
+) -> AppResult<BTreeMap<String, String>> {
+    let assets: Vec<u64> = items
+        .iter()
+        .filter(|i| !i.is_bundle())
+        .map(|i| i.id)
+        .collect();
+    let bundles: Vec<u64> = items
+        .iter()
+        .filter(|i| i.is_bundle())
+        .map(|i| i.id)
+        .collect();
+    let bundle_size = if size == "150x150" {
+        "150x150"
+    } else {
+        "420x420"
+    };
     let thumbs = &ctx.state.thumbnails;
-    let asset_query = IdQuery { kind: "Asset", size: &size, format: "Webp", include_profile_frame: None };
-    let bundle_query = IdQuery { kind: "BundleThumbnail", size: bundle_size, format: "Png", include_profile_frame: None };
+    let asset_query = IdQuery {
+        kind: "Asset",
+        size: &size,
+        format: "Webp",
+        include_profile_frame: None,
+    };
+    let bundle_query = IdQuery {
+        kind: "BundleThumbnail",
+        size: bundle_size,
+        format: "Png",
+        include_profile_frame: None,
+    };
     let fetch = |path: &'static str, size: String, format: &'static str| {
         move |missing: Vec<u64>| {
             let size = size.clone();
             async move {
                 let mut out = Vec::new();
                 for chunk in missing.chunks(THUMBNAIL_BATCH) {
-                    let (param, base) = if path == "assets" { ("assetIds", "assets") } else { ("bundleIds", "bundles/thumbnails") };
-                    let url = format!("{}/{base}?{param}={}&size={size}&format={format}", endpoints::THUMBNAILS_V1, join_ids(chunk));
+                    let (param, base) = if path == "assets" {
+                        ("assetIds", "assets")
+                    } else {
+                        ("bundleIds", "bundles/thumbnails")
+                    };
+                    let url = format!(
+                        "{}/{base}?{param}={}&size={size}&format={format}",
+                        endpoints::THUMBNAILS_V1,
+                        join_ids(chunk)
+                    );
                     match ctx.state.roblox.get::<ThumbPage>(&url).await {
                         Ok(page) => out.extend(page.data),
                         Err(error) => {
@@ -519,7 +699,11 @@ async fn item_thumbnails(ctx: &Ctx, items: Vec<ItemRef>, size: String) -> AppRes
     };
     let (a, b) = futures::join!(
         thumbs.batch_by_id(&assets, &asset_query, fetch("assets", size.clone(), "Webp")),
-        thumbs.batch_by_id(&bundles, &bundle_query, fetch("bundles", bundle_size.to_owned(), "Png")),
+        thumbs.batch_by_id(
+            &bundles,
+            &bundle_query,
+            fetch("bundles", bundle_size.to_owned(), "Png")
+        ),
     );
     let mut out = a?;
     out.extend(b?);
@@ -603,10 +787,21 @@ async fn topics(ctx: &Ctx, request: Option<Value>) -> Value {
                 .into_iter()
                 .flatten()
                 .filter_map(|t| {
-                    let display = t.get("displayName").and_then(Value::as_str).filter(|s| !s.is_empty())?;
-                    let original = t.get("originalTopicName").and_then(Value::as_str).unwrap_or("");
-                    let key = if original.is_empty() { display } else { original };
-                    seen.insert(key.to_owned()).then(|| json!({ "displayName": display, "originalTopicName": original }))
+                    let display = t
+                        .get("displayName")
+                        .and_then(Value::as_str)
+                        .filter(|s| !s.is_empty())?;
+                    let original = t
+                        .get("originalTopicName")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    let key = if original.is_empty() {
+                        display
+                    } else {
+                        original
+                    };
+                    seen.insert(key.to_owned())
+                        .then(|| json!({ "displayName": display, "originalTopicName": original }))
                 })
                 .collect();
             Value::Array(list)
@@ -619,7 +814,9 @@ async fn topics(ctx: &Ctx, request: Option<Value>) -> Value {
 }
 
 async fn recommendations(ctx: &Ctx, request: Value) -> Value {
-    let Some(asset_id) = request.get("assetId").and_then(Value::as_u64) else { return json!([]) };
+    let Some(asset_id) = request.get("assetId").and_then(Value::as_u64) else {
+        return json!([]);
+    };
     let mut url = format!(
         "{}/recommendations/assets?assetId={asset_id}&numItems={}&details=false",
         endpoints::CATALOG_V2,
@@ -629,7 +826,13 @@ async fn recommendations(ctx: &Ctx, request: Value) -> Value {
         url.push_str(&format!("&assetTypeId={type_id}"));
     }
     let ids: Vec<u64> = match ctx.state.roblox.get::<Value>(&url).await {
-        Ok(raw) => raw.get("data").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_u64).collect(),
+        Ok(raw) => raw
+            .get("data")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_u64)
+            .collect(),
         Err(error) => {
             tracing::warn!(%error, "Failed to fetch recommendations");
             return json!([]);
@@ -638,7 +841,13 @@ async fn recommendations(ctx: &Ctx, request: Value) -> Value {
     if ids.is_empty() {
         return json!([]);
     }
-    let refs: Vec<ItemRef> = ids.into_iter().map(|id| ItemRef { id, item_type: "Asset".into() }).collect();
+    let refs: Vec<ItemRef> = ids
+        .into_iter()
+        .map(|id| ItemRef {
+            id,
+            item_type: "Asset".into(),
+        })
+        .collect();
     match items_details(&ctx.state, &refs, false).await {
         Ok(items) => Value::Array(items),
         Err(_) => json!([]),
@@ -648,27 +857,50 @@ async fn recommendations(ctx: &Ctx, request: Value) -> Value {
 async fn promoted_shop_pages(ctx: &Ctx, force: bool) -> AppResult<Value> {
     let mut slot = ctx.state.catalog.promoted_pages.lock().await;
     if !force {
-        if let Some((_, pages)) = slot.as_ref().filter(|(at, _)| at.elapsed() < PROMOTED_PAGES_TTL) {
+        if let Some((_, pages)) = slot
+            .as_ref()
+            .filter(|(at, _)| at.elapsed() < PROMOTED_PAGES_TTL)
+        {
             return Ok(pages.clone());
         }
     }
     let installation_id = gated_installation_id(&ctx.state);
-    let query = [("installation_id", installation_id.as_str()), ("version", env!("CARGO_PKG_VERSION"))];
-    let mut raw: Value = ctx.state.metadata.api().get("/v1/marketplace/promoted-pages", &query).await?;
+    let query = [
+        ("installation_id", installation_id.as_str()),
+        ("version", env!("CARGO_PKG_VERSION")),
+    ];
+    let mut raw: Value = ctx
+        .state
+        .metadata
+        .api()
+        .get("/v1/marketplace/promoted-pages", &query)
+        .await?;
     let pages = raw.get_mut("pages").map(Value::take).unwrap_or(Value::Null);
     *slot = Some((Instant::now(), pages.clone()));
     Ok(pages)
 }
 
 fn favorite_url(user_id: u64, item: &ItemRef) -> String {
-    let kind = if item.is_bundle() { "bundles" } else { "assets" };
-    format!("{}/favorites/users/{user_id}/{kind}/{}/favorite", endpoints::CATALOG_V1, item.id)
+    let kind = if item.is_bundle() {
+        "bundles"
+    } else {
+        "assets"
+    };
+    format!(
+        "{}/favorites/users/{user_id}/{kind}/{}/favorite",
+        endpoints::CATALOG_V1,
+        item.id
+    )
 }
 
 // ------------------------------------------------------------------ cart
 
 fn cart_path(state: &AppState, user_id: u64) -> PathBuf {
-    state.paths.base.join("marketplace-carts").join(format!("cart-{user_id}.json"))
+    state
+        .paths
+        .base
+        .join("marketplace-carts")
+        .join(format!("cart-{user_id}.json"))
 }
 
 fn cart_key(item: &Value) -> String {
@@ -682,7 +914,12 @@ fn cart_key(item: &Value) -> String {
 fn read_cart(state: &AppState, user_id: u64) -> Option<Vec<Value>> {
     let bytes = std::fs::read(cart_path(state, user_id)).ok()?;
     match serde_json::from_slice::<Value>(&bytes) {
-        Ok(cart) => Some(cart.get("items").and_then(Value::as_array).cloned().unwrap_or_default()),
+        Ok(cart) => Some(
+            cart.get("items")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default(),
+        ),
         Err(error) => {
             tracing::warn!(user_id, %error, "Failed to read cart");
             None
@@ -756,14 +993,20 @@ pub fn register(router: &mut Router) {
         })
         .handle("catalog:getFavoriteStatus", |ctx, args| async move {
             let item: ItemRef = args.get(0)?;
-            let Some(user_id) = ctx.state.auth.current_user_id() else { return Ok(false) };
+            let Some(user_id) = ctx.state.auth.current_user_id() else {
+                return Ok(false);
+            };
             let raw: Value = ctx.state.roblox.get(&favorite_url(user_id, &item)).await?;
             Ok(!raw.is_null())
         })
         .handle("catalog:setFavorite", |ctx, args| async move {
             let item: ItemRef = args.get(0)?;
             let favorite: bool = args.get(1)?;
-            let user_id = ctx.state.auth.current_user_id().ok_or_else(|| AppError::msg("Not logged in"))?;
+            let user_id = ctx
+                .state
+                .auth
+                .current_user_id()
+                .ok_or_else(|| AppError::msg("Not logged in"))?;
             let url = favorite_url(user_id, &item);
             if favorite {
                 ctx.state.roblox.post_empty::<Value>(&url).await?;
@@ -773,12 +1016,16 @@ pub fn register(router: &mut Router) {
             Ok(favorite)
         })
         .handle("cart:get", |ctx, _| async move {
-            let Some(user_id) = ctx.state.auth.current_user_id() else { return Ok(cart(Vec::new())) };
+            let Some(user_id) = ctx.state.auth.current_user_id() else {
+                return Ok(cart(Vec::new()));
+            };
             Ok(cart(read_cart(&ctx.state, user_id).unwrap_or_default()))
         })
         .handle("cart:add", |ctx, args| async move {
             let item: Value = args.get(0)?;
-            let Some(user_id) = ctx.state.auth.current_user_id() else { return Ok(cart(Vec::new())) };
+            let Some(user_id) = ctx.state.auth.current_user_id() else {
+                return Ok(cart(Vec::new()));
+            };
             let mut items = read_cart(&ctx.state, user_id).unwrap_or_default();
             let key = cart_key(&item);
             if items.iter().any(|existing| cart_key(existing) == key) {
@@ -793,15 +1040,21 @@ pub fn register(router: &mut Router) {
         })
         .handle("cart:remove", |ctx, args| async move {
             let item: ItemRef = args.get(0)?;
-            let Some(user_id) = ctx.state.auth.current_user_id() else { return Ok(cart(Vec::new())) };
-            let Some(items) = read_cart(&ctx.state, user_id) else { return Ok(cart(Vec::new())) };
+            let Some(user_id) = ctx.state.auth.current_user_id() else {
+                return Ok(cart(Vec::new()));
+            };
+            let Some(items) = read_cart(&ctx.state, user_id) else {
+                return Ok(cart(Vec::new()));
+            };
             let key = item.key();
             let items: Vec<Value> = items.into_iter().filter(|e| cart_key(e) != key).collect();
             write_cart(&ctx.state, user_id, &items);
             Ok(cart(items))
         })
         .handle("cart:clear", |ctx, _| async move {
-            let Some(user_id) = ctx.state.auth.current_user_id() else { return Ok(cart(Vec::new())) };
+            let Some(user_id) = ctx.state.auth.current_user_id() else {
+                return Ok(cart(Vec::new()));
+            };
             write_cart(&ctx.state, user_id, &[]);
             Ok(cart(Vec::new()))
         });
@@ -821,6 +1074,9 @@ mod tests {
         assert_eq!(item["itemRestrictions"], json!(["Limited", "Collectible"]));
         assert_eq!(item["price"], Value::Null);
         assert!(item.get("isOffSale").is_none());
-        assert_eq!(normalize_creator_name(Some("  roblox user ")), Some("ROBLOX+USER".into()));
+        assert_eq!(
+            normalize_creator_name(Some("  roblox user ")),
+            Some("ROBLOX+USER".into())
+        );
     }
 }

@@ -18,7 +18,12 @@ use crate::services::{metadata, protocol, roblox_layout};
 use crate::state::AppState;
 
 const ALLOWED_SCHEMES: [&str; 5] = ["http", "https", "roblox-player", "roblox", "roblox-studio"];
-const TRUSTED_DOMAINS: [&str; 4] = ["lunar.gg", "lunarclient.com", "moonsworth.com", "roblox.com"];
+const TRUSTED_DOMAINS: [&str; 4] = [
+    "lunar.gg",
+    "lunarclient.com",
+    "moonsworth.com",
+    "roblox.com",
+];
 const TRUSTED_DOMAINS_CACHE_KEY: &str = "external-links.trusted-domains";
 const DEFAULT_TOAST_DURATION_MS: u64 = 8_000;
 const TOAST_CONTEXT_TTL_BUFFER_MS: u64 = 60_000;
@@ -40,7 +45,8 @@ fn is_external_open_allowed(url: &str) -> bool {
 
 fn external_hostname(url: &str) -> Option<String> {
     let parsed = Url::parse(url).ok()?;
-    matches!(parsed.scheme(), "http" | "https").then(|| parsed.host_str().unwrap_or("").to_lowercase())
+    matches!(parsed.scheme(), "http" | "https")
+        .then(|| parsed.host_str().unwrap_or("").to_lowercase())
 }
 
 fn in_domains<S: AsRef<str>>(host: &str, domains: &[S]) -> bool {
@@ -75,14 +81,20 @@ pub fn open_external_url(url: &str) {
     {
         use std::os::windows::process::CommandExt;
         // `explorer <url>` hands the URL to its registered handler without a shell.
-        let _ = std::process::Command::new("explorer.exe").arg(url).creation_flags(0x0800_0000).spawn();
+        let _ = std::process::Command::new("explorer.exe")
+            .arg(url)
+            .creation_flags(0x0800_0000)
+            .spawn();
     }
     #[cfg(not(windows))]
     let _ = url;
 }
 
 fn perform_external_open(state: &AppState, url: &str, source_route: Option<Value>) {
-    state.track("external.open", json!({ "url": url, "source_route": source_route }));
+    state.track(
+        "external.open",
+        json!({ "url": url, "source_route": source_route }),
+    );
     open_external_url(url);
 }
 
@@ -90,24 +102,52 @@ fn perform_external_open(state: &AppState, url: &str, source_route: Option<Value
 
 /// `ToastService.showToast` (requests from the renderer carry no callbacks).
 pub fn show_toast(state: &AppState, options: &Value) -> String {
-    let id = options.get("id").and_then(Value::as_str).map(str::to_owned).unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-    let duration = options.get("duration").and_then(Value::as_u64).unwrap_or(DEFAULT_TOAST_DURATION_MS);
-    let placement = options.get("placement").and_then(Value::as_str).unwrap_or("both");
+    let id = options
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let duration = options
+        .get("duration")
+        .and_then(Value::as_u64)
+        .unwrap_or(DEFAULT_TOAST_DURATION_MS);
+    let placement = options
+        .get("placement")
+        .and_then(Value::as_str)
+        .unwrap_or("both");
     let analytics = options.get("analytics").filter(|a| !a.is_null()).cloned();
     {
         let mut toasts = state.misc.toasts.lock();
         let now = Instant::now();
         toasts.retain(|_, (expires, _)| *expires > now);
-        toasts.insert(id.clone(), (now + Duration::from_millis(duration + TOAST_CONTEXT_TTL_BUFFER_MS), analytics.clone()));
+        toasts.insert(
+            id.clone(),
+            (
+                now + Duration::from_millis(duration + TOAST_CONTEXT_TTL_BUFFER_MS),
+                analytics.clone(),
+            ),
+        );
     }
     let mut payload = Map::new();
     if let Some(actions) = options.get("actions").and_then(Value::as_array) {
         payload.insert(
             "actions".into(),
-            Value::Array(actions.iter().map(|a| json!({ "id": a.get("id"), "text": a.get("text") })).collect()),
+            Value::Array(
+                actions
+                    .iter()
+                    .map(|a| json!({ "id": a.get("id"), "text": a.get("text") }))
+                    .collect(),
+            ),
         );
     }
-    for key in ["body", "image", "isDismissable", "title", "variant", "variantData"] {
+    for key in [
+        "body",
+        "image",
+        "isDismissable",
+        "title",
+        "variant",
+        "variantData",
+    ] {
         if let Some(v) = options.get(key) {
             payload.insert(key.into(), v.clone());
         }
@@ -117,10 +157,20 @@ pub fn show_toast(state: &AppState, options: &Value) -> String {
     let payload = Value::Object(payload);
     let track = |interaction: &str, placement: &str| {
         if let Some(analytics) = &analytics {
-            let mut event = analytics.get("payload").and_then(Value::as_object).cloned().unwrap_or_default();
+            let mut event = analytics
+                .get("payload")
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default();
             event.insert("interactionType".into(), json!(interaction));
             event.insert("notificationId".into(), json!(id));
-            event.insert("notificationType".into(), analytics.get("notificationType").cloned().unwrap_or(Value::Null));
+            event.insert(
+                "notificationType".into(),
+                analytics
+                    .get("notificationType")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            );
             event.insert("placement".into(), json!(placement));
             if placement == "native" {
                 event.insert("actionId".into(), Value::Null);
@@ -147,9 +197,18 @@ pub fn show_toast(state: &AppState, options: &Value) -> String {
         if force || !focused {
             let title = payload.get("title").and_then(Value::as_str).unwrap_or("");
             let body = payload.get("body").and_then(Value::as_str).unwrap_or("");
-            match state.app.notification().builder().title(title).body(body).show() {
+            match state
+                .app
+                .notification()
+                .builder()
+                .title(title)
+                .body(body)
+                .show()
+            {
                 Ok(()) => track("impression", "native"),
-                Err(error) => tracing::warn!("[ToastService] Failed to show OS notification: {error}"),
+                Err(error) => {
+                    tracing::warn!("[ToastService] Failed to show OS notification: {error}")
+                }
             }
         }
     }
@@ -157,7 +216,10 @@ pub fn show_toast(state: &AppState, options: &Value) -> String {
 }
 
 fn handle_toast_interaction(state: &AppState, interaction: &Value) -> bool {
-    let id = interaction.get("toastId").and_then(Value::as_str).unwrap_or("");
+    let id = interaction
+        .get("toastId")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     let analytics = match state.misc.toasts.lock().get(id) {
         Some((_, analytics)) => analytics.clone(),
         None => {
@@ -166,12 +228,31 @@ fn handle_toast_interaction(state: &AppState, interaction: &Value) -> bool {
         }
     };
     if let Some(analytics) = analytics {
-        let mut event = analytics.get("payload").and_then(Value::as_object).cloned().unwrap_or_default();
-        event.insert("actionId".into(), interaction.get("actionId").cloned().unwrap_or(Value::Null));
-        event.insert("extra".into(), interaction.get("extra").cloned().unwrap_or(Value::Null));
-        event.insert("interactionType".into(), interaction.get("type").cloned().unwrap_or(Value::Null));
+        let mut event = analytics
+            .get("payload")
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        event.insert(
+            "actionId".into(),
+            interaction.get("actionId").cloned().unwrap_or(Value::Null),
+        );
+        event.insert(
+            "extra".into(),
+            interaction.get("extra").cloned().unwrap_or(Value::Null),
+        );
+        event.insert(
+            "interactionType".into(),
+            interaction.get("type").cloned().unwrap_or(Value::Null),
+        );
         event.insert("notificationId".into(), json!(id));
-        event.insert("notificationType".into(), analytics.get("notificationType").cloned().unwrap_or(Value::Null));
+        event.insert(
+            "notificationType".into(),
+            analytics
+                .get("notificationType")
+                .cloned()
+                .unwrap_or(Value::Null),
+        );
         event.insert("placement".into(), json!("toast"));
         state.track("notification.interaction", Value::Object(event));
     }
@@ -182,7 +263,11 @@ fn handle_toast_interaction(state: &AppState, interaction: &Value) -> bool {
 
 async fn item_values(state: &AppState, force: bool) -> Result<Value, AppError> {
     let mut slot = state.misc.item_values.lock().await;
-    let max_age = if force { ITEM_VALUE_REFRESH_COOLDOWN } else { ITEM_VALUE_TTL };
+    let max_age = if force {
+        ITEM_VALUE_REFRESH_COOLDOWN
+    } else {
+        ITEM_VALUE_TTL
+    };
     if let Some((fetched, cache)) = slot.as_ref() {
         if fetched.elapsed() < max_age {
             return Ok(cache.clone());
@@ -190,9 +275,19 @@ async fn item_values(state: &AppState, force: bool) -> Result<Value, AppError> {
     }
     tracing::debug!("[ItemValues] Fetching value map");
     let installation_id = metadata::gated_installation_id(state);
-    let query = [("installation_id", installation_id.as_str()), ("version", env!("CARGO_PKG_VERSION"))];
-    let mut response: Value = state.metadata.api().get("/v1/economy/items/rolimons", &query).await?;
-    let map = response.get_mut("items").map(Value::take).unwrap_or(Value::Null);
+    let query = [
+        ("installation_id", installation_id.as_str()),
+        ("version", env!("CARGO_PKG_VERSION")),
+    ];
+    let mut response: Value = state
+        .metadata
+        .api()
+        .get("/v1/economy/items/rolimons", &query)
+        .await?;
+    let map = response
+        .get_mut("items")
+        .map(Value::take)
+        .unwrap_or(Value::Null);
     let cache = json!({ "fetchedAt": crate::util::now_millis(), "map": map });
     *slot = Some((Instant::now(), cache.clone()));
     Ok(cache)

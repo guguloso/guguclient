@@ -34,7 +34,10 @@ pub fn query(key: &str, value_name: Option<&str>) -> Query {
     };
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
-        return if stderr.contains("unable to find") || stderr.contains("não foi poss") || output.status.code() == Some(1) {
+        return if stderr.contains("unable to find")
+            || stderr.contains("não foi poss")
+            || output.status.code() == Some(1)
+        {
             Query::Missing
         } else {
             Query::Error(stderr.trim().to_owned())
@@ -46,16 +49,23 @@ pub fn query(key: &str, value_name: Option<&str>) -> Query {
         // `<name>    REG_SZ    <data>`; the default value's name is localized,
         // so for `/ve` take the first value line under the key.
         let matches_name = match value_name {
-            Some(name) => trimmed.starts_with(name) && trimmed[name.len()..].starts_with(char::is_whitespace),
+            Some(name) => {
+                trimmed.starts_with(name) && trimmed[name.len()..].starts_with(char::is_whitespace)
+            }
             None => trimmed.contains("REG_"),
         };
         if !matches_name || !line.starts_with(' ') {
             continue;
         }
-        let Some(pos) = trimmed.find("REG_") else { continue };
+        let Some(pos) = trimmed.find("REG_") else {
+            continue;
+        };
         let rest = &trimmed[pos..];
         let (kind, data) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
-        return Query::Found { data: data.trim().to_owned(), kind: kind.to_owned() };
+        return Query::Found {
+            data: data.trim().to_owned(),
+            kind: kind.to_owned(),
+        };
     }
     Query::Missing
 }

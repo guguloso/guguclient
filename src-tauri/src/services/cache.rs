@@ -18,9 +18,16 @@ impl CacheService {
     pub fn open(paths: &LauncherPaths) -> AppResult<Self> {
         let store = JsonStore::open(&paths.settings_dir, CACHE_STORE_NAME)?;
         let top_level_keys = store.top_level_keys();
-        let shown = if top_level_keys.is_empty() { "<none>".to_owned() } else { top_level_keys.join(", ") };
+        let shown = if top_level_keys.is_empty() {
+            "<none>".to_owned()
+        } else {
+            top_level_keys.join(", ")
+        };
         tracing::info!("[Cache] Loaded cache.json (top-level keys: {shown})");
-        Ok(Self { store, top_level_keys })
+        Ok(Self {
+            store,
+            top_level_keys,
+        })
     }
 
     pub fn get(&self, key: &str) -> Option<Value> {

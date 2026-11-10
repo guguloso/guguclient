@@ -12,16 +12,16 @@ use serde_json::{json, Map, Value};
 use crate::error::{AppError, AppResult};
 use crate::ipc::Router;
 use crate::services::roblox_layout::{
-    self as layout, ensure_instance_data_dir, instance_config_dir, instance_data_dir, is_valid_instance_id,
-    is_valid_version_hash, read_json, write_json, PRODUCTS,
+    self as layout, ensure_instance_data_dir, instance_config_dir, instance_data_dir,
+    is_valid_instance_id, is_valid_version_hash, read_json, write_json, PRODUCTS,
 };
 use crate::state::AppState;
 use crate::util::now_iso;
 
 const DEFAULT_FPS_CAP: i64 = 60;
 const ICON_COLORS: [&str; 12] = [
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9", "#F8B500",
-    "#16A085",
+    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F",
+    "#BB8FCE", "#85C1E9", "#F8B500", "#16A085",
 ];
 
 pub type Instance = Map<String, Value>;
@@ -32,7 +32,10 @@ pub struct InstancesService {
 }
 
 pub fn product_of(instance: &Instance) -> &str {
-    instance.get("product").and_then(Value::as_str).unwrap_or("player")
+    instance
+        .get("product")
+        .and_then(Value::as_str)
+        .unwrap_or("player")
 }
 
 pub fn version_hash_of(instance: &Instance) -> &str {
@@ -62,7 +65,9 @@ fn config_path(base: &Path, id: &str, product: &str) -> AppResult<std::path::Pat
 /// `readInstanceFromProduct`, including the legacy `channel` migration.
 fn read_instance(base: &Path, id: &str, product: &str) -> Option<Instance> {
     let path = config_path(base, id, product).ok()?;
-    let Value::Object(mut instance) = read_json(&path)? else { return None };
+    let Value::Object(mut instance) = read_json(&path)? else {
+        return None;
+    };
     if instance.get("version").is_none_or(Value::is_null) {
         if let Some(channel) = instance.get("channel").cloned().filter(|c| !c.is_null()) {
             instance.insert(
@@ -76,7 +81,10 @@ fn read_instance(base: &Path, id: &str, product: &str) -> Option<Instance> {
     if instance.get("product").is_none_or(Value::is_null) {
         instance.insert("product".into(), Value::String(product.to_owned()));
     }
-    if !instance.get("accountUserId").is_some_and(|v| v.is_number() || v.is_null()) {
+    if !instance
+        .get("accountUserId")
+        .is_some_and(|v| v.is_number() || v.is_null())
+    {
         instance.insert("accountUserId".into(), Value::Null);
     }
     Some(instance)
@@ -91,7 +99,9 @@ impl InstancesService {
         if !is_valid_instance_id(id) {
             return None;
         }
-        PRODUCTS.into_iter().find(|p| config_path(base, id, p).is_ok_and(|path| path.exists()))
+        PRODUCTS
+            .into_iter()
+            .find(|p| config_path(base, id, p).is_ok_and(|path| path.exists()))
     }
 
     pub fn get(&self, base: &Path, id: &str) -> Option<Instance> {
@@ -107,7 +117,9 @@ impl InstancesService {
         for product in PRODUCTS {
             let dir = layout::product_paths(base, product).instances_dir;
             let _ = std::fs::create_dir_all(&dir);
-            let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().into_owned();
                 if !(entry.file_type().is_ok_and(|t| t.is_dir()) && is_valid_instance_id(&name)) {
@@ -121,13 +133,19 @@ impl InstancesService {
         // Most recently launched first, then newest created. Timestamps are
         // `toISOString()` UTC strings, so text order is chronological order.
         instances.sort_by(|a, b| {
-            let (la, lb) = (a.get("lastLaunchedAt").filter(|v| v.is_string()), b.get("lastLaunchedAt").filter(|v| v.is_string()));
+            let (la, lb) = (
+                a.get("lastLaunchedAt").filter(|v| v.is_string()),
+                b.get("lastLaunchedAt").filter(|v| v.is_string()),
+            );
             match (la, lb) {
                 (Some(x), Some(y)) => y.as_str().cmp(&x.as_str()),
                 (Some(_), None) => std::cmp::Ordering::Less,
                 (None, Some(_)) => std::cmp::Ordering::Greater,
                 (None, None) => {
-                    let (ca, cb) = (a.get("createdAt").and_then(Value::as_str), b.get("createdAt").and_then(Value::as_str));
+                    let (ca, cb) = (
+                        a.get("createdAt").and_then(Value::as_str),
+                        b.get("createdAt").and_then(Value::as_str),
+                    );
                     cb.cmp(&ca)
                 }
             }
@@ -138,8 +156,14 @@ impl InstancesService {
 
     pub fn save(&self, base: &Path, instance: &Instance) -> AppResult<()> {
         self.invalidate();
-        let id = instance.get("id").and_then(Value::as_str).unwrap_or_default();
-        write_json(&config_path(base, id, product_of(instance))?, &Value::Object(instance.clone()))
+        let id = instance
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        write_json(
+            &config_path(base, id, product_of(instance))?,
+            &Value::Object(instance.clone()),
+        )
     }
 }
 
@@ -163,9 +187,16 @@ fn random_color() -> &'static str {
 
 pub fn create(state: &AppState, options: CreateOptions) -> AppResult<Instance> {
     let base = &state.paths.base;
-    let hash = options.version.get("versionHash").and_then(Value::as_str).unwrap_or_default();
+    let hash = options
+        .version
+        .get("versionHash")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if !is_valid_version_hash(hash) {
-        tracing::warn!("Refused to create instance '{}' with invalid version hash '{hash}'", options.name);
+        tracing::warn!(
+            "Refused to create instance '{}' with invalid version hash '{hash}'",
+            options.name
+        );
         return Err(AppError::msg(format!("Invalid version hash: '{hash}'")));
     }
     let id = uuid::Uuid::new_v4().to_string();
@@ -180,7 +211,10 @@ pub fn create(state: &AppState, options: CreateOptions) -> AppResult<Instance> {
     instance.insert("name".into(), json!(options.name));
     instance.insert("product".into(), json!(options.product));
     instance.insert("version".into(), options.version);
-    instance.insert("autoUpdate".into(), json!(options.auto_update.unwrap_or(false)));
+    instance.insert(
+        "autoUpdate".into(),
+        json!(options.auto_update.unwrap_or(false)),
+    );
     instance.insert("accountUserId".into(), json!(options.account_user_id));
     instance.insert("fastFlags".into(), fast_flags);
     instance.insert("fpsCap".into(), json!(DEFAULT_FPS_CAP));
@@ -190,12 +224,22 @@ pub fn create(state: &AppState, options: CreateOptions) -> AppResult<Instance> {
     if let Some(description) = options.description {
         instance.insert("description".into(), description);
     }
-    let color = options.icon_color.filter(|c| !c.is_empty()).unwrap_or_else(|| random_color().to_owned());
+    let color = options
+        .icon_color
+        .filter(|c| !c.is_empty())
+        .unwrap_or_else(|| random_color().to_owned());
     instance.insert("iconColor".into(), json!(color));
     state.instances.save(base, &instance)?;
     ensure_instance_data_dir(base, &id, &options.product)?;
-    tracing::info!("Created {} instance: {} ({id})", options.product, options.name);
-    state.track("instance.create", json!({ "instance_id": id, "instance_name": options.name }));
+    tracing::info!(
+        "Created {} instance: {} ({id})",
+        options.product,
+        options.name
+    );
+    state.track(
+        "instance.create",
+        json!({ "instance_id": id, "instance_name": options.name }),
+    );
     Ok(instance)
 }
 
@@ -206,7 +250,9 @@ fn resolve_launch_avatar(
     instance: &Instance,
     updates: &Map<String, Value>,
 ) -> Result<Option<Value>, &'static str> {
-    let requested = updates.get("launchAvatar").filter(|v| !v.is_null() && *v != &Value::Bool(false));
+    let requested = updates
+        .get("launchAvatar")
+        .filter(|v| !v.is_null() && *v != &Value::Bool(false));
     if let Some(requested) = requested {
         if product_of(instance) != "player" {
             return Err("only Player instances wear one");
@@ -218,17 +264,30 @@ fn resolve_launch_avatar(
             return Err("its account is not stored");
         }
     }
-    let account = if updates.contains_key("accountUserId") { updates.get("accountUserId") } else { instance.get("accountUserId") };
+    let account = if updates.contains_key("accountUserId") {
+        updates.get("accountUserId")
+    } else {
+        instance.get("accountUserId")
+    };
     let avatar = if updates.contains_key("launchAvatar") {
         updates.get("launchAvatar").cloned()
     } else {
         instance.get("launchAvatar").cloned()
     };
-    let avatar_user = avatar.as_ref().and_then(|a| a.get("userId")).and_then(Value::as_u64);
-    let other_account = account.and_then(Value::as_u64).is_some_and(|a| Some(a) != avatar_user);
+    let avatar_user = avatar
+        .as_ref()
+        .and_then(|a| a.get("userId"))
+        .and_then(Value::as_u64);
+    let other_account = account
+        .and_then(Value::as_u64)
+        .is_some_and(|a| Some(a) != avatar_user);
     let has_avatar = avatar.as_ref().is_some_and(|a| a.is_object());
     if has_avatar && other_account {
-        return if requested.is_some() { Err("it belongs to another account") } else { Ok(Some(Value::Null)) };
+        return if requested.is_some() {
+            Err("it belongs to another account")
+        } else {
+            Ok(Some(Value::Null))
+        };
     }
     Ok(avatar)
 }
@@ -237,11 +296,19 @@ pub fn update(state: &AppState, id: &str, updates: Map<String, Value>) -> Option
     let base = &state.paths.base;
     let instance = state.instances.get(base, id)?;
     let product = product_of(&instance).to_owned();
-    if let Some(p) = updates.get("product").and_then(Value::as_str).filter(|p| *p != product) {
+    if let Some(p) = updates
+        .get("product")
+        .and_then(Value::as_str)
+        .filter(|p| *p != product)
+    {
         tracing::warn!("Refused to mutate instance product for {id} from {product} to {p}");
         return None;
     }
-    if let Some(hash) = updates.get("version").and_then(|v| v.get("versionHash")).and_then(Value::as_str) {
+    if let Some(hash) = updates
+        .get("version")
+        .and_then(|v| v.get("versionHash"))
+        .and_then(Value::as_str)
+    {
         if !is_valid_version_hash(hash) {
             tracing::warn!("Refused to pin invalid version hash '{hash}' on instance {id}");
             return None;
@@ -271,11 +338,19 @@ pub fn update(state: &AppState, id: &str, updates: Map<String, Value>) -> Option
 
 async fn delete(state: &AppState, id: &str) -> bool {
     let base = &state.paths.base;
-    let Some(instance) = state.instances.get(base, id) else { return false };
+    let Some(instance) = state.instances.get(base, id) else {
+        return false;
+    };
     state.instances.invalidate();
     let product = product_of(&instance);
     let mut deleted = false;
-    for dir in [instance_config_dir(base, id, product), instance_data_dir(base, id, product)].into_iter().flatten() {
+    for dir in [
+        instance_config_dir(base, id, product),
+        instance_data_dir(base, id, product),
+    ]
+    .into_iter()
+    .flatten()
+    {
         if dir.exists() {
             match tokio::fs::remove_dir_all(&dir).await {
                 Ok(()) => deleted = true,
@@ -308,7 +383,9 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
 
 fn duplicate(state: &AppState, id: &str, new_name: String) -> AppResult<Option<Instance>> {
     let base = &state.paths.base;
-    let Some(source) = state.instances.get(base, id) else { return Ok(None) };
+    let Some(source) = state.instances.get(base, id) else {
+        return Ok(None);
+    };
     let product = product_of(&source).to_owned();
     let duplicated = create(
         state,
@@ -319,15 +396,34 @@ fn duplicate(state: &AppState, id: &str, new_name: String) -> AppResult<Option<I
             auto_update: source.get("autoUpdate").and_then(Value::as_bool),
             account_user_id: source.get("accountUserId").and_then(Value::as_u64),
             description: source.get("description").cloned(),
-            icon_color: source.get("iconColor").and_then(Value::as_str).map(str::to_owned),
+            icon_color: source
+                .get("iconColor")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
             copy_from_instance_id: Some(id.to_owned()),
         },
     )?;
-    let new_id = duplicated.get("id").and_then(Value::as_str).unwrap_or_default().to_owned();
-    if source.get("autoLaunchPlaceId").is_some_and(|v| !v.is_null()) {
+    let new_id = duplicated
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    if source
+        .get("autoLaunchPlaceId")
+        .is_some_and(|v| !v.is_null())
+    {
         let mut patch = Map::new();
-        patch.insert("autoLaunchPlaceId".into(), source["autoLaunchPlaceId"].clone());
-        patch.insert("autoLaunchPlaceName".into(), source.get("autoLaunchPlaceName").cloned().unwrap_or(Value::Null));
+        patch.insert(
+            "autoLaunchPlaceId".into(),
+            source["autoLaunchPlaceId"].clone(),
+        );
+        patch.insert(
+            "autoLaunchPlaceName".into(),
+            source
+                .get("autoLaunchPlaceName")
+                .cloned()
+                .unwrap_or(Value::Null),
+        );
         update(state, &new_id, patch);
     }
     if let Some(avatar) = source.get("launchAvatar").filter(|v| !v.is_null()) {
@@ -335,7 +431,10 @@ fn duplicate(state: &AppState, id: &str, new_name: String) -> AppResult<Option<I
         patch.insert("launchAvatar".into(), avatar.clone());
         update(state, &new_id, patch);
     }
-    let (src_dir, dst_dir) = (instance_config_dir(base, id, &product)?, instance_config_dir(base, &new_id, &product)?);
+    let (src_dir, dst_dir) = (
+        instance_config_dir(base, id, &product)?,
+        instance_config_dir(base, &new_id, &product)?,
+    );
     for name in ["mods", "mods-manifest.json"] {
         let from = src_dir.join(name);
         if from.exists() {
@@ -353,7 +452,9 @@ fn duplicate(state: &AppState, id: &str, new_name: String) -> AppResult<Option<I
                     patch.insert("customFont".into(), font.clone());
                     update(state, &new_id, patch);
                 }
-                Err(error) => tracing::warn!(%error, "Failed to copy custom font while duplicating instance {id}"),
+                Err(error) => {
+                    tracing::warn!(%error, "Failed to copy custom font while duplicating instance {id}")
+                }
             }
         }
     }
@@ -361,17 +462,25 @@ fn duplicate(state: &AppState, id: &str, new_name: String) -> AppResult<Option<I
         "instance.duplicate",
         json!({ "source_instance_id": id, "new_instance_id": new_id, "new_instance_name": duplicated.get("name") }),
     );
-    Ok(Some(state.instances.get(base, &new_id).unwrap_or(duplicated)))
+    Ok(Some(
+        state.instances.get(base, &new_id).unwrap_or(duplicated),
+    ))
 }
 
 fn set_fast_flags(state: &AppState, id: &str, fast_flags: Map<String, Value>) -> AppResult<bool> {
     let base = &state.paths.base;
-    let Some(mut instance) = state.instances.get(base, id) else { return Ok(false) };
+    let Some(mut instance) = state.instances.get(base, id) else {
+        return Ok(false);
+    };
     let parsed = match fast_flags.get("DFIntTaskSchedulerTargetFps") {
         Some(Value::Number(n)) => Some(Value::Number(n.clone())),
         Some(Value::String(s)) if !s.trim().is_empty() => {
             let t = s.trim();
-            t.parse::<i64>().map(Value::from).ok().or_else(|| t.parse::<f64>().ok().and_then(|f| serde_json::Number::from_f64(f).map(Value::Number)))
+            t.parse::<i64>().map(Value::from).ok().or_else(|| {
+                t.parse::<f64>()
+                    .ok()
+                    .and_then(|f| serde_json::Number::from_f64(f).map(Value::Number))
+            })
         }
         _ => None,
     };
@@ -394,8 +503,14 @@ fn set_fast_flags(state: &AppState, id: &str, fast_flags: Map<String, Value>) ->
 
 fn set_fps_cap(state: &AppState, id: &str, fps: Value) -> AppResult<bool> {
     let base = &state.paths.base;
-    let Some(mut instance) = state.instances.get(base, id) else { return Ok(false) };
-    let mut flags = instance.get("fastFlags").and_then(Value::as_object).cloned().unwrap_or_default();
+    let Some(mut instance) = state.instances.get(base, id) else {
+        return Ok(false);
+    };
+    let mut flags = instance
+        .get("fastFlags")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
     flags.insert("DFIntTaskSchedulerTargetFps".into(), fps.clone());
     if fps.as_f64() != Some(DEFAULT_FPS_CAP as f64) {
         flags.insert("FFlagFixForcingVsyncOff".into(), Value::Bool(true));
@@ -408,8 +523,14 @@ fn set_fps_cap(state: &AppState, id: &str, fps: Value) -> AppResult<bool> {
 
 /// `markInstanceLaunched`.
 pub fn mark_launched(state: &AppState, id: &str) {
-    let Some(instance) = state.instances.get(&state.paths.base, id) else { return };
-    let count = instance.get("playCount").and_then(Value::as_u64).unwrap_or(0) + 1;
+    let Some(instance) = state.instances.get(&state.paths.base, id) else {
+        return;
+    };
+    let count = instance
+        .get("playCount")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        + 1;
     let now = now_iso();
     let mut patch = Map::new();
     patch.insert("lastLaunchedAt".into(), json!(now));
@@ -420,11 +541,19 @@ pub fn mark_launched(state: &AppState, id: &str) {
 
 /// `markInstanceStopped`: adds the session to `totalPlaytimeMs`.
 pub fn mark_stopped(state: &AppState, id: &str) {
-    let Some(instance) = state.instances.get(&state.paths.base, id) else { return };
-    let Some(start) = instance.get("currentSessionStart").and_then(Value::as_str) else { return };
+    let Some(instance) = state.instances.get(&state.paths.base, id) else {
+        return;
+    };
+    let Some(start) = instance.get("currentSessionStart").and_then(Value::as_str) else {
+        return;
+    };
     let started = parse_iso_millis(start).unwrap_or_else(crate::util::now_millis);
     let duration = crate::util::now_millis().saturating_sub(started);
-    let total = instance.get("totalPlaytimeMs").and_then(Value::as_u64).unwrap_or(0) + duration;
+    let total = instance
+        .get("totalPlaytimeMs")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        + duration;
     let mut patch = Map::new();
     patch.insert("totalPlaytimeMs".into(), json!(total));
     patch.insert("currentSessionStart".into(), Value::Null);
@@ -453,7 +582,9 @@ pub fn parse_iso_millis(s: &str) -> Option<u64> {
 
 pub fn register(router: &mut Router) {
     router
-        .handle("instances:getAll", |ctx, _| async move { Ok(ctx.state.instances.all(&ctx.state.paths.base)) })
+        .handle("instances:getAll", |ctx, _| async move {
+            Ok(ctx.state.instances.all(&ctx.state.paths.base))
+        })
         .handle("instances:get", |ctx, args| async move {
             let id: String = args.get(0)?;
             Ok(ctx.state.instances.get(&ctx.state.paths.base, &id))
@@ -486,11 +617,9 @@ pub fn register(router: &mut Router) {
         .handle("instances:isVersionInstalled", |ctx, args| async move {
             let id: String = args.get(0)?;
             let base = &ctx.state.paths.base;
-            Ok(ctx
-                .state
-                .instances
-                .get(base, &id)
-                .is_some_and(|i| layout::is_version_installed(base, version_hash_of(&i), product_of(&i))))
+            Ok(ctx.state.instances.get(base, &id).is_some_and(|i| {
+                layout::is_version_installed(base, version_hash_of(&i), product_of(&i))
+            }))
         })
         .handle("instances:getFastFlags", |ctx, args| async move {
             let id: String = args.get(0)?;
@@ -527,9 +656,16 @@ pub fn register(router: &mut Router) {
         .handle("instances:openDataFolder", |ctx, args| async move {
             let id: String = args.get(0)?;
             let base = &ctx.state.paths.base;
-            let instance =
-                ctx.state.instances.get(base, &id).ok_or_else(|| AppError::msg(format!("Instance '{id}' not found")))?;
-            Ok(layout::open_path(&instance_data_dir(base, &id, product_of(&instance))?))
+            let instance = ctx
+                .state
+                .instances
+                .get(base, &id)
+                .ok_or_else(|| AppError::msg(format!("Instance '{id}' not found")))?;
+            Ok(layout::open_path(&instance_data_dir(
+                base,
+                &id,
+                product_of(&instance),
+            )?))
         });
 }
 
@@ -538,6 +674,9 @@ mod tests {
     #[test]
     fn iso_round_trip() {
         let ms = 1_794_297_176_730u64;
-        assert_eq!(super::parse_iso_millis(&crate::util::iso8601_from_millis(ms)), Some(ms));
+        assert_eq!(
+            super::parse_iso_millis(&crate::util::iso8601_from_millis(ms)),
+            Some(ms)
+        );
     }
 }

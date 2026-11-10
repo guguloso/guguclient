@@ -54,6 +54,7 @@ pub struct AppState {
     pub protocol: crate::services::protocol::ProtocolService,
     pub game_preferences: crate::services::preferences::GamePreferences,
     pub feeds: crate::services::feeds::FeedsState,
+    pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
 impl AppState {
@@ -69,8 +70,16 @@ impl AppState {
             settings: SettingsService::open(&paths)?,
             feature_flags: FeatureFlagService::initialize(&cache),
             cache,
-            auth: AuthService::load(paths.auth_file.clone(), crypto, Arc::clone(&roblox), events.clone()),
-            thumbnails: ThumbnailService::new(Arc::clone(&roblox), paths.thumbnail_cache_dir.clone()),
+            auth: AuthService::load(
+                paths.auth_file.clone(),
+                crypto,
+                Arc::clone(&roblox),
+                events.clone(),
+            ),
+            thumbnails: ThumbnailService::new(
+                Arc::clone(&roblox),
+                paths.thumbnail_cache_dir.clone(),
+            ),
             user_search: UserSearchState::default(),
             discovery: DiscoveryState::default(),
             analytics: AnalyticsQueue::default(),
@@ -89,6 +98,7 @@ impl AppState {
             protocol: Default::default(),
             game_preferences: crate::services::preferences::GamePreferences::open(&paths)?,
             feeds: Default::default(),
+            game_communities: Default::default(),
             app,
             events,
             roblox,

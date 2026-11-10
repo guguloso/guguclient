@@ -63,7 +63,12 @@ pub fn is_app_link(url: &str) -> bool {
 /// `extractProtocolUrl(argv)`.
 pub fn extract_protocol_url(argv: &[String]) -> Option<String> {
     argv.iter()
-        .find(|a| a.starts_with(PLAYER_PREFIX) || a.starts_with(ROBLOX_PREFIX) || a.starts_with(STUDIO_PREFIX) || is_app_link(a))
+        .find(|a| {
+            a.starts_with(PLAYER_PREFIX)
+                || a.starts_with(ROBLOX_PREFIX)
+                || a.starts_with(STUDIO_PREFIX)
+                || is_app_link(a)
+        })
         .cloned()
 }
 
@@ -77,11 +82,15 @@ fn non_negative_int(raw: Option<&str>) -> Option<u64> {
     if raw.is_empty() || !raw.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    raw.parse::<u64>().ok().filter(|v| *v <= 9_007_199_254_740_991)
+    raw.parse::<u64>()
+        .ok()
+        .filter(|v| *v <= 9_007_199_254_740_991)
 }
 
 fn query(url: &Url, key: &str) -> Option<String> {
-    url.query_pairs().find(|(k, _)| k == key).map(|(_, v)| v.into_owned())
+    url.query_pairs()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| v.into_owned())
 }
 
 pub fn redact(url: &str) -> String {
@@ -94,7 +103,8 @@ pub fn redact(url: &str) -> String {
     } else if is_app_link(url) {
         match Url::parse(url) {
             Ok(parsed) => {
-                let mut keys: Vec<String> = parsed.query_pairs().map(|(k, _)| k.into_owned()).collect();
+                let mut keys: Vec<String> =
+                    parsed.query_pairs().map(|(k, _)| k.into_owned()).collect();
                 keys.sort();
                 keys.dedup();
                 let host = parsed.host_str().unwrap_or("").to_lowercase();
@@ -134,7 +144,9 @@ pub fn parse_deep_link(url: &str) -> Option<Value> {
             _ => return None,
         };
         let target = positive_int(pairs.get(key).copied())?;
-        return Some(json!({ "kind": "studio", "action": action, "targetId": target, "rawUrl": url }));
+        return Some(
+            json!({ "kind": "studio", "action": action, "targetId": target, "rawUrl": url }),
+        );
     }
     if url.starts_with(ROBLOX_PREFIX) {
         let parsed = Url::parse(url).ok()?;
@@ -167,16 +179,29 @@ fn action_type(host: &str) -> Option<&'static str> {
 
 /// `parseAppLinkNavigateUrl`.
 fn valid_navigate_target(to: &str) -> bool {
-    if !to.starts_with('/') || to.starts_with("//") || to.chars().any(|c| c.is_whitespace() || c == '\\' || c.is_control()) {
+    if !to.starts_with('/')
+        || to.starts_with("//")
+        || to
+            .chars()
+            .any(|c| c.is_whitespace() || c == '\\' || c.is_control())
+    {
         return false;
     }
-    let Ok(url) = Url::parse("lunar-roblox://navigate").and_then(|base| base.join(to)) else { return false };
-    let path = urlencoding::decode(url.path()).map(|p| p.to_lowercase()).unwrap_or_default();
-    !EXCLUDED_NAVIGATE_PREFIXES.iter().any(|p| path == *p || path.starts_with(&format!("{p}/")))
+    let Ok(url) = Url::parse("lunar-roblox://navigate").and_then(|base| base.join(to)) else {
+        return false;
+    };
+    let path = urlencoding::decode(url.path())
+        .map(|p| p.to_lowercase())
+        .unwrap_or_default();
+    !EXCLUDED_NAVIGATE_PREFIXES
+        .iter()
+        .any(|p| path == *p || path.starts_with(&format!("{p}/")))
 }
 
 fn asset_id_list(raw: Option<&str>) -> Option<Vec<u64>> {
-    let Some(raw) = raw.filter(|r| !r.is_empty()) else { return Some(Vec::new()) };
+    let Some(raw) = raw.filter(|r| !r.is_empty()) else {
+        return Some(Vec::new());
+    };
     let mut ids = Vec::new();
     for token in raw.split(',').map(str::trim).filter(|t| !t.is_empty()) {
         let id = positive_int(Some(token))?;
@@ -208,14 +233,22 @@ fn parse_app_link(state: &AppState, url: &str) -> Option<Value> {
     let kind = action_type(parsed.host_str().unwrap_or(""))?;
     let q = |k: &str| query(&parsed, k);
     match kind {
-        "launch" => positive_int(q("placeId").as_deref()).map(|place| json!({ "type": "launch", "placeId": place })),
-        "navigate" => q("to").filter(|to| valid_navigate_target(to)).map(|to| json!({ "type": "navigate", "to": to })),
+        "launch" => positive_int(q("placeId").as_deref())
+            .map(|place| json!({ "type": "launch", "placeId": place })),
+        "navigate" => q("to")
+            .filter(|to| valid_navigate_target(to))
+            .map(|to| json!({ "type": "navigate", "to": to })),
         "close-game" | "close-launcher" | "check-for-updates" => Some(json!({ "type": kind })),
         "set-launcher-stream" => {
             let stream = q("stream")?.to_lowercase();
             let valid = stream.len() <= 32
-                && stream.chars().next().is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
-                && stream.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-');
+                && stream
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                && stream
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-');
             valid.then(|| json!({ "type": "set-launcher-stream", "stream": stream }))
         }
         "set-setting" => {
@@ -232,9 +265,17 @@ fn parse_app_link(state: &AppState, url: &str) -> Option<Value> {
                     _ => return None,
                 }
             } else if id == "theme" {
-                if raw == "dark" || raw == "light" { json!(raw) } else { return None }
+                if raw == "dark" || raw == "light" {
+                    json!(raw)
+                } else {
+                    return None;
+                }
             } else if id == "auto-check-updates" {
-                if ["disabled", "check-only", "check-and-download"].contains(&raw.as_str()) { json!(raw) } else { return None }
+                if ["disabled", "check-only", "check-and-download"].contains(&raw.as_str()) {
+                    json!(raw)
+                } else {
+                    return None;
+                }
             } else {
                 return None;
             };
@@ -309,7 +350,13 @@ pub async fn handle_url(state: &Arc<AppState>, url: &str, initiator: &str) {
     if is_app_link(url) {
         let action = parse_app_link(state, url);
         let parsed = Url::parse(url).ok();
-        let utm = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"];
+        let utm = [
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_content",
+            "utm_term",
+        ];
         let mut payload = json!({
             "action": action.as_ref().and_then(|a| a.get("type").cloned())
                 .or_else(|| parsed.as_ref().and_then(|p| action_type(p.host_str().unwrap_or("")).map(Value::from)))
@@ -318,7 +365,11 @@ pub async fn handle_url(state: &Arc<AppState>, url: &str, initiator: &str) {
             "initiator": initiator,
         });
         for key in utm {
-            payload[key] = parsed.as_ref().and_then(|p| query(p, key)).map(Value::from).unwrap_or(Value::Null);
+            payload[key] = parsed
+                .as_ref()
+                .and_then(|p| query(p, key))
+                .map(Value::from)
+                .unwrap_or(Value::Null);
         }
         state.track("launcher.app_link", payload);
         let Some(action) = action else {
@@ -326,11 +377,16 @@ pub async fn handle_url(state: &Arc<AppState>, url: &str, initiator: &str) {
             dispatch_app_link(state, json!({ "type": "unsupported" }));
             return;
         };
-        let kind = action.get("type").and_then(Value::as_str).unwrap_or("").to_owned();
+        let kind = action
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned();
         tracing::info!("Parsed app link action: {kind}");
         match kind.as_str() {
             "launch" => {
-                let link = json!({ "kind": "place", "placeId": action.get("placeId"), "rawUrl": url });
+                let link =
+                    json!({ "kind": "place", "placeId": action.get("placeId"), "rawUrl": url });
                 dispatch_deep_link(state, link, initiator);
             }
             "close-launcher" => {
@@ -365,11 +421,16 @@ fn is_self_command(command: &str) -> bool {
         .and_then(|rest| rest.split('"').next())
         .or_else(|| command.split_whitespace().next())
         .map(str::to_lowercase);
-    let Some(exe_in_command) = exe_in_command else { return false };
-    let Ok(current) = std::env::current_exe() else { return false };
+    let Some(exe_in_command) = exe_in_command else {
+        return false;
+    };
+    let Ok(current) = std::env::current_exe() else {
+        return false;
+    };
     let current = current.display().to_string().to_lowercase();
     exe_in_command == current
-        || std::path::Path::new(&exe_in_command).file_name() == std::path::Path::new(&current).file_name()
+        || std::path::Path::new(&exe_in_command).file_name()
+            == std::path::Path::new(&current).file_name()
 }
 
 fn command_key(scheme: &str) -> String {
@@ -378,7 +439,9 @@ fn command_key(scheme: &str) -> String {
 
 /// `app.setAsDefaultProtocolClient` on Windows.
 fn set_protocol_client(scheme: &str) -> bool {
-    let Some(command) = self_command() else { return false };
+    let Some(command) = self_command() else {
+        return false;
+    };
     let class_key = format!("{CLASS_PREFIX}{scheme}");
     registry::set(&class_key, None, "REG_SZ", &format!("URL:{scheme}")).is_ok()
         && registry::set(&class_key, Some("URL Protocol"), "REG_SZ", "").is_ok()
@@ -398,7 +461,8 @@ fn capture_backup(scheme: &str) -> bool {
         }
         registry::Query::Found { data, kind } if data.contains("%1") && !is_self_command(&data) => {
             let ok = registry::set(BACKUP_KEY, Some(scheme), &kind, &data).is_ok()
-                && registry::set(BACKUP_KEY, Some(&format!("{scheme}.type")), "REG_SZ", &kind).is_ok();
+                && registry::set(BACKUP_KEY, Some(&format!("{scheme}.type")), "REG_SZ", &kind)
+                    .is_ok();
             if ok {
                 tracing::info!("Backed up the existing {scheme} handler");
             } else {
@@ -418,7 +482,9 @@ fn delete_backup(scheme: &str) {
 fn restore_handler(scheme: &str) {
     let key = command_key(scheme);
     match registry::query(&key, None) {
-        registry::Query::Error(error) => tracing::warn!("Could not query the {scheme} handler for restore: {error}"),
+        registry::Query::Error(error) => {
+            tracing::warn!("Could not query the {scheme} handler for restore: {error}")
+        }
         registry::Query::Missing => delete_backup(scheme),
         registry::Query::Found { data, .. } if data.contains("%1") => {
             if !is_self_command(&data) {
@@ -426,7 +492,9 @@ fn restore_handler(scheme: &str) {
                 return;
             }
             match registry::query(BACKUP_KEY, Some(scheme)) {
-                registry::Query::Error(error) => tracing::warn!("Could not read the {scheme} handler backup: {error}"),
+                registry::Query::Error(error) => {
+                    tracing::warn!("Could not read the {scheme} handler backup: {error}")
+                }
                 registry::Query::Found { data, kind } => {
                     if registry::set(&key, None, &kind, &data).is_ok() {
                         tracing::info!("Restored the original {scheme} handler");
@@ -459,12 +527,25 @@ pub async fn sync_handlers(state: &AppState) {
         }
     }
     if state.settings.get_bool("handle-roblox-urls") {
-        let safe: Vec<&str> = ROBLOX_SCHEMES.into_iter().filter(|s| capture_backup(s)).collect();
-        let skipped: Vec<&str> = ROBLOX_SCHEMES.into_iter().filter(|s| !safe.contains(s)).collect();
+        let safe: Vec<&str> = ROBLOX_SCHEMES
+            .into_iter()
+            .filter(|s| capture_backup(s))
+            .collect();
+        let skipped: Vec<&str> = ROBLOX_SCHEMES
+            .into_iter()
+            .filter(|s| !safe.contains(s))
+            .collect();
         if !skipped.is_empty() {
-            tracing::warn!("Skipping takeover of unreadable handlers: {}", skipped.join(", "));
+            tracing::warn!(
+                "Skipping takeover of unreadable handlers: {}",
+                skipped.join(", ")
+            );
         }
-        let failures: Vec<&str> = safe.iter().copied().filter(|s| !set_protocol_client(s)).collect();
+        let failures: Vec<&str> = safe
+            .iter()
+            .copied()
+            .filter(|s| !set_protocol_client(s))
+            .collect();
         if !failures.is_empty() {
             tracing::warn!("Protocol registration failed for: {}", failures.join(", "));
         } else if skipped.is_empty() {
@@ -479,8 +560,12 @@ pub async fn sync_handlers(state: &AppState) {
 
 pub fn register(router: &mut Router) {
     router
-        .handle("protocol:consumePendingDeepLink", |ctx, _| async move { Ok(ctx.state.protocol.pending_deep_link.lock().take()) })
-        .handle("protocol:consumePendingAppLink", |ctx, _| async move { Ok(ctx.state.protocol.pending_app_link.lock().take()) });
+        .handle("protocol:consumePendingDeepLink", |ctx, _| async move {
+            Ok(ctx.state.protocol.pending_deep_link.lock().take())
+        })
+        .handle("protocol:consumePendingAppLink", |ctx, _| async move {
+            Ok(ctx.state.protocol.pending_app_link.lock().take())
+        });
 }
 
 #[cfg(test)]
@@ -491,13 +576,22 @@ mod tests {
     fn deep_links_parse_like_electron() {
         let player = "roblox-player:1+launchmode:play+placelauncherurl:https%3A%2F%2Fassetgame.roblox.com%2Fgame%2FPlaceLauncher.ashx%3Frequest%3DRequestGame%26placeId%3D920587237";
         assert_eq!(parse_deep_link(player).unwrap()["placeId"], 920587237);
-        assert_eq!(parse_deep_link("roblox://experiences/start?placeId=42").unwrap()["placeId"], 42);
-        assert_eq!(parse_deep_link("roblox://placeId=77&x=1").unwrap()["placeId"], 77);
+        assert_eq!(
+            parse_deep_link("roblox://experiences/start?placeId=42").unwrap()["placeId"],
+            42
+        );
+        assert_eq!(
+            parse_deep_link("roblox://placeId=77&x=1").unwrap()["placeId"],
+            77
+        );
         let studio = parse_deep_link("roblox-studio:1+task:EditPlace+placeId:5").unwrap();
         assert_eq!(studio["action"], "edit-place");
         assert!(valid_navigate_target("/games/charts"));
         assert!(!valid_navigate_target("/updater"));
         assert!(!valid_navigate_target("//evil"));
-        assert_eq!(redact("lunar-roblox://launch?placeId=1&b=2"), "lunar-roblox://launch?b&placeId");
+        assert_eq!(
+            redact("lunar-roblox://launch?placeId=1&b=2"),
+            "lunar-roblox://launch?b&placeId"
+        );
     }
 }

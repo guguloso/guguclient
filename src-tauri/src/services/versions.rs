@@ -19,7 +19,9 @@ use serde_json::{json, Value};
 
 use crate::error::{AppError, AppResult};
 use crate::ipc::Router;
-use crate::services::roblox_layout::{self as layout, platform_config, product_paths, read_json, write_json};
+use crate::services::roblox_layout::{
+    self as layout, platform_config, product_paths, read_json, write_json,
+};
 use crate::state::AppState;
 use crate::util::now_iso;
 
@@ -33,10 +35,26 @@ const CLIENT_SETTINGS_CDN_BASE_URL: &str = "https://clientsettingscdn.roblox.com
 const CLIENT_SETTINGS_BASE_URL: &str = "https://clientsettings.roblox.com";
 const ROBLOX_USER_AGENT: &str = "RobloxLauncher/0.1.0";
 const CHANNELS: [(&str, &str, &str); 4] = [
-    ("LIVE", "LIVE (Stable)", "Production release - recommended for most users"),
-    ("zlive", "zlive", "Live channel with additional feature flags"),
-    ("zcanary", "zcanary (Beta)", "Early testing builds with new features"),
-    ("zintegration", "zintegration", "Internal integration testing"),
+    (
+        "LIVE",
+        "LIVE (Stable)",
+        "Production release - recommended for most users",
+    ),
+    (
+        "zlive",
+        "zlive",
+        "Live channel with additional feature flags",
+    ),
+    (
+        "zcanary",
+        "zcanary (Beta)",
+        "Early testing builds with new features",
+    ),
+    (
+        "zintegration",
+        "zintegration",
+        "Internal integration testing",
+    ),
 ];
 const APP_SETTINGS_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Settings>\n\t<ContentFolder>content</ContentFolder>\n\t<BaseUrl>http://www.roblox.com</BaseUrl>\n</Settings>";
 pub const DOWNLOAD_PROGRESS: &str = "versions:downloadProgress";
@@ -77,10 +95,15 @@ async fn fetch_client_version(
     let path = if channel == "LIVE" {
         format!("/v2/client-version/{binary_type}")
     } else {
-        format!("/v2/client-version/{binary_type}/channel/{}", urlencoding::encode(channel))
+        format!(
+            "/v2/client-version/{binary_type}/channel/{}",
+            urlencoding::encode(channel)
+        )
     };
     let send = |base: &str| {
-        let mut request = plain_http(state).get(format!("{base}{path}")).header("cookie", "");
+        let mut request = plain_http(state)
+            .get(format!("{base}{path}"))
+            .header("cookie", "");
         if let Some(token) = token {
             request = request.header("Roblox-Channel-Token", token);
         }
@@ -95,7 +118,9 @@ async fn fetch_client_version(
         if channel != "LIVE" && matches!(status, 401 | 403 | 404) {
             return Ok(Err(ChannelUnavailable));
         }
-        return Err(AppError::msg(format!("Version lookup failed with status {status}")));
+        return Err(AppError::msg(format!(
+            "Version lookup failed with status {status}"
+        )));
     }
     Ok(Ok(response.json().await?))
 }
@@ -103,7 +128,11 @@ async fn fetch_client_version(
 async fn fetch_channel_token(state: &AppState, binary_type: &str) -> Option<String> {
     let url = format!("{CLIENT_SETTINGS_BASE_URL}/v2/user-channel?binaryType={binary_type}");
     match state.roblox.get::<Value>(&url).await {
-        Ok(r) => r.get("token").and_then(Value::as_str).filter(|t| !t.is_empty()).map(str::to_owned),
+        Ok(r) => r
+            .get("token")
+            .and_then(Value::as_str)
+            .filter(|t| !t.is_empty())
+            .map(str::to_owned),
         Err(error) => {
             tracing::warn!("Failed to fetch user channel token: {error}");
             None
@@ -111,7 +140,11 @@ async fn fetch_channel_token(state: &AppState, binary_type: &str) -> Option<Stri
     }
 }
 
-async fn client_version(state: &AppState, binary_type: &str, channel: &str) -> AppResult<Result<Value, ChannelUnavailable>> {
+async fn client_version(
+    state: &AppState,
+    binary_type: &str,
+    channel: &str,
+) -> AppResult<Result<Value, ChannelUnavailable>> {
     if channel == "LIVE" {
         return fetch_client_version(state, binary_type, channel, None).await;
     }
@@ -128,7 +161,11 @@ async fn client_version(state: &AppState, binary_type: &str, channel: &str) -> A
     fetch_client_version(state, binary_type, channel, token.as_deref()).await
 }
 
-pub async fn latest_version(state: &AppState, channel: &str, product: &str) -> AppResult<VersionInfo> {
+pub async fn latest_version(
+    state: &AppState,
+    channel: &str,
+    product: &str,
+) -> AppResult<VersionInfo> {
     latest_or_unavailable(state, channel, product)
         .await?
         .map_err(|_| AppError::msg(format!("Channel '{channel}' is unavailable")))
@@ -145,13 +182,21 @@ async fn latest_or_unavailable(
         Err(unavailable) => return Ok(Err(unavailable)),
     };
     let (Some(version), Some(upload)) = (
-        raw.get("version").and_then(Value::as_str).filter(|v| !v.is_empty()),
-        raw.get("clientVersionUpload").and_then(Value::as_str).filter(|v| !v.is_empty()),
+        raw.get("version")
+            .and_then(Value::as_str)
+            .filter(|v| !v.is_empty()),
+        raw.get("clientVersionUpload")
+            .and_then(Value::as_str)
+            .filter(|v| !v.is_empty()),
     ) else {
         return Err(AppError::msg("Invalid response from version API"));
     };
     Ok(Ok(VersionInfo {
-        bootstrapper_version: raw.get("bootstrapperVersion").and_then(Value::as_str).unwrap_or("").to_owned(),
+        bootstrapper_version: raw
+            .get("bootstrapperVersion")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned(),
         channel: channel.to_owned(),
         client_version_upload: upload.to_owned(),
         product: product.to_owned(),
@@ -167,7 +212,9 @@ fn registry_path(state: &AppState, product: &str) -> PathBuf {
 
 /// `readInstalledVersionsMetadata`, with the legacy-field migration.
 fn read_registry(state: &AppState, product: &str) -> Vec<Value> {
-    let Some(Value::Array(list)) = read_json(&registry_path(state, product)) else { return Vec::new() };
+    let Some(Value::Array(list)) = read_json(&registry_path(state, product)) else {
+        return Vec::new();
+    };
     let mut migrated_any = false;
     let out: Vec<Value> = list
         .iter()
@@ -178,14 +225,25 @@ fn read_registry(state: &AppState, product: &str) -> Vec<Value> {
                 .or_else(|| v.get("version").and_then(Value::as_str))
                 .unwrap_or("Unknown");
             let item_product = v.get("product").and_then(Value::as_str).unwrap_or(product);
-            if v.get("product").and_then(Value::as_str) != Some(item_product) || v.get("displayVersion").and_then(Value::as_str) != Some(display) {
+            if v.get("product").and_then(Value::as_str) != Some(item_product)
+                || v.get("displayVersion").and_then(Value::as_str) != Some(display)
+            {
                 migrated_any = true;
             }
             let mut entry = serde_json::Map::new();
             entry.insert("product".into(), json!(item_product));
-            entry.insert("versionHash".into(), v.get("versionHash").cloned().unwrap_or(Value::Null));
+            entry.insert(
+                "versionHash".into(),
+                v.get("versionHash").cloned().unwrap_or(Value::Null),
+            );
             entry.insert("displayVersion".into(), json!(display));
-            for key in ["channel", "installedAt", "lastUsedAt", "sizeBytes", "source"] {
+            for key in [
+                "channel",
+                "installedAt",
+                "lastUsedAt",
+                "sizeBytes",
+                "source",
+            ] {
                 if let Some(value) = v.get(key) {
                     entry.insert(key.into(), value.clone());
                 }
@@ -200,34 +258,49 @@ fn read_registry(state: &AppState, product: &str) -> Vec<Value> {
 }
 
 fn save_registry(state: &AppState, product: &str, versions: &[Value]) {
-    if let Err(error) = write_json(&registry_path(state, product), &Value::Array(versions.to_vec())) {
+    if let Err(error) = write_json(
+        &registry_path(state, product),
+        &Value::Array(versions.to_vec()),
+    ) {
         tracing::warn!(%error, "Failed to save installed versions");
     }
 }
 
 fn hash_of(v: &Value) -> &str {
-    v.get("versionHash").and_then(Value::as_str).unwrap_or_default()
+    v.get("versionHash")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
 }
 
 pub fn installed_versions(state: &AppState, product: &str) -> Vec<Value> {
     let base = &state.paths.base;
-    let installed: Vec<Value> =
-        read_registry(state, product).into_iter().filter(|v| layout::is_version_installed(base, hash_of(v), product)).collect();
+    let installed: Vec<Value> = read_registry(state, product)
+        .into_iter()
+        .filter(|v| layout::is_version_installed(base, hash_of(v), product))
+        .collect();
     backfill_sizes(state, product, &installed);
     installed
 }
 
 /// `scheduleSizeBackfill` (synchronous: directory sizes are cheap here).
 fn backfill_sizes(state: &AppState, product: &str, versions: &[Value]) {
-    let missing: Vec<String> =
-        versions.iter().filter(|v| v.get("sizeBytes").is_none()).map(|v| hash_of(v).to_owned()).collect();
+    let missing: Vec<String> = versions
+        .iter()
+        .filter(|v| v.get("sizeBytes").is_none())
+        .map(|v| hash_of(v).to_owned())
+        .collect();
     if missing.is_empty() {
         return;
     }
     let base = state.paths.base.clone();
     let sizes: HashMap<String, u64> = missing
         .iter()
-        .filter_map(|hash| Some((hash.clone(), dir_size(&layout::version_install_dir(&base, hash, product).ok()?))))
+        .filter_map(|hash| {
+            Some((
+                hash.clone(),
+                dir_size(&layout::version_install_dir(&base, hash, product).ok()?),
+            ))
+        })
         .collect();
     let mut changed = false;
     let updated: Vec<Value> = read_registry(state, product)
@@ -248,17 +321,23 @@ fn backfill_sizes(state: &AppState, product: &str, versions: &[Value]) {
 }
 
 fn dir_size(path: &Path) -> u64 {
-    let Ok(meta) = std::fs::symlink_metadata(path) else { return 0 };
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
+        return 0;
+    };
     if !meta.is_dir() {
         return meta.len();
     }
-    std::fs::read_dir(path).map(|entries| entries.flatten().map(|e| dir_size(&e.path())).sum()).unwrap_or(0)
+    std::fs::read_dir(path)
+        .map(|entries| entries.flatten().map(|e| dir_size(&e.path())).sum())
+        .unwrap_or(0)
 }
 
 /// `markVersionUsed`.
 pub fn mark_version_used(state: &AppState, product: &str, hash: &str) {
     let mut versions = read_registry(state, product);
-    let Some(entry) = versions.iter_mut().find(|v| hash_of(v) == hash) else { return };
+    let Some(entry) = versions.iter_mut().find(|v| hash_of(v) == hash) else {
+        return;
+    };
     entry["lastUsedAt"] = json!(now_iso());
     save_registry(state, product, &versions);
 }
@@ -286,7 +365,10 @@ fn parse_manifest(text: &str, product: &str) -> Vec<Package> {
             break;
         }
         if !skipped.contains(&name) {
-            out.push(Package { name: name.to_owned(), signature: signature.to_owned() });
+            out.push(Package {
+                name: name.to_owned(),
+                signature: signature.to_owned(),
+            });
         }
         i += 4;
     }
@@ -294,14 +376,25 @@ fn parse_manifest(text: &str, product: &str) -> Vec<Package> {
 }
 
 fn package_url(base: &str, channel: &str, hash: &str, file: &str) -> String {
-    let channel_path = if channel == "LIVE" { "" } else { "/channel/common" };
+    let channel_path = if channel == "LIVE" {
+        ""
+    } else {
+        "/channel/common"
+    };
     format!("{base}{channel_path}/{hash}-{file}")
 }
 
 async fn download_file(state: &AppState, url: &str, dest: &Path) -> AppResult<()> {
-    let mut response = plain_http(state).get(url).header("User-Agent", ROBLOX_USER_AGENT).send().await?;
+    let mut response = plain_http(state)
+        .get(url)
+        .header("User-Agent", ROBLOX_USER_AGENT)
+        .send()
+        .await?;
     if !response.status().is_success() {
-        return Err(AppError::msg(format!("Download failed: {}", response.status())));
+        return Err(AppError::msg(format!(
+            "Download failed: {}",
+            response.status()
+        )));
     }
     let mut file = std::fs::File::create(dest)?;
     while let Some(chunk) = response.chunk().await? {
@@ -315,10 +408,13 @@ async fn download_file(state: &AppState, url: &str, dest: &Path) -> AppResult<()
 fn extract_zip(zip_path: &Path, dest: &Path) -> AppResult<()> {
     std::fs::create_dir_all(dest)?;
     let file = std::fs::File::open(zip_path)?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| AppError::msg(format!("Invalid archive: {e}")))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| AppError::msg(format!("Invalid archive: {e}")))?;
     let mut skipped = Vec::new();
     for index in 0..archive.len() {
-        let mut entry = archive.by_index(index).map_err(|e| AppError::msg(e.to_string()))?;
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|e| AppError::msg(e.to_string()))?;
         let Some(relative) = entry.enclosed_name() else {
             skipped.push(entry.name().to_owned());
             continue;
@@ -338,13 +434,22 @@ fn extract_zip(zip_path: &Path, dest: &Path) -> AppResult<()> {
         tracing::warn!(
             "Skipped {} invalid entries while extracting {}",
             skipped.len(),
-            zip_path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default()
+            zip_path
+                .file_name()
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default()
         );
     }
     Ok(())
 }
 
-fn progress(state: &AppState, info: &VersionInfo, phase: &str, percent: u64, package: Option<(&str, usize, usize)>) {
+fn progress(
+    state: &AppState,
+    info: &VersionInfo,
+    phase: &str,
+    percent: u64,
+    package: Option<(&str, usize, usize)>,
+) {
     let mut payload = json!({ "product": info.product, "phase": phase, "percent": percent, "version": info.version });
     if let Some((name, index, count)) = package {
         payload["package"] = json!({ "name": name, "index": index, "count": count });
@@ -352,7 +457,11 @@ fn progress(state: &AppState, info: &VersionInfo, phase: &str, percent: u64, pac
     state.events.emit(DOWNLOAD_PROGRESS, payload);
 }
 
-async fn download_with_manifest(state: &AppState, info: &VersionInfo, install_dir: &Path) -> AppResult<()> {
+async fn download_with_manifest(
+    state: &AppState,
+    info: &VersionInfo,
+    install_dir: &Path,
+) -> AppResult<()> {
     let product = info.product.as_str();
     let hash = info.client_version_upload.as_str();
     let mut manifest = None;
@@ -360,7 +469,12 @@ async fn download_with_manifest(state: &AppState, info: &VersionInfo, install_di
     for base in ROBLOX_CDN_MIRRORS {
         tracing::debug!("Trying to fetch manifest from {base}...");
         let url = package_url(base, &info.channel, hash, "rbxPkgManifest.txt");
-        match plain_http(state).get(&url).header("User-Agent", ROBLOX_USER_AGENT).send().await {
+        match plain_http(state)
+            .get(&url)
+            .header("User-Agent", ROBLOX_USER_AGENT)
+            .send()
+            .await
+        {
             Ok(r) if r.status().is_success() => {
                 manifest = Some((base, r.text().await?));
                 break;
@@ -370,11 +484,16 @@ async fn download_with_manifest(state: &AppState, info: &VersionInfo, install_di
         }
         tracing::warn!("Failed to fetch manifest from {base}: {last_error}");
     }
-    let (base, text) = manifest
-        .ok_or_else(|| AppError::msg(format!("Failed to fetch package manifest after trying all mirrors: {last_error}")))?;
+    let (base, text) = manifest.ok_or_else(|| {
+        AppError::msg(format!(
+            "Failed to fetch package manifest after trying all mirrors: {last_error}"
+        ))
+    })?;
     let packages = parse_manifest(&text, product);
     tracing::info!("Found {} packages to download from {base}", packages.len());
-    let temp = product_paths(&state.paths.base, product).temp_dir.join(format!("{hash}-packages"));
+    let temp = product_paths(&state.paths.base, product)
+        .temp_dir
+        .join(format!("{hash}-packages"));
     std::fs::create_dir_all(&temp)?;
     let map = platform_config(product).package_map;
     let result: AppResult<()> = async {
@@ -389,11 +508,28 @@ async fn download_with_manifest(state: &AppState, info: &VersionInfo, install_di
                 tracing::debug!("Skipping {} (WebView2 runtime installer)", pkg.name);
                 continue;
             }
-            progress(state, info, "downloading", percent, Some((&pkg.name, i + 1, count)));
+            progress(
+                state,
+                info,
+                "downloading",
+                percent,
+                Some((&pkg.name, i + 1, count)),
+            );
             let download_path = temp.join(&pkg.signature);
-            download_file(state, &package_url(base, &info.channel, hash, &pkg.name), &download_path).await?;
+            download_file(
+                state,
+                &package_url(base, &info.channel, hash, &pkg.name),
+                &download_path,
+            )
+            .await?;
             let target = install_dir.join(subdir);
-            progress(state, info, "extracting", percent, Some((&pkg.name, i + 1, count)));
+            progress(
+                state,
+                info,
+                "extracting",
+                percent,
+                Some((&pkg.name, i + 1, count)),
+            );
             let zip_path = download_path.clone();
             tauri::async_runtime::spawn_blocking(move || extract_zip(&zip_path, &target))
                 .await
@@ -413,7 +549,11 @@ async fn download_with_manifest(state: &AppState, info: &VersionInfo, install_di
     Ok(())
 }
 
-async fn perform_download(state: Arc<AppState>, info: VersionInfo, source: String) -> AppResult<Value> {
+async fn perform_download(
+    state: Arc<AppState>,
+    info: VersionInfo,
+    source: String,
+) -> AppResult<Value> {
     let product = info.product.clone();
     let hash = info.client_version_upload.clone();
     let base = state.paths.base.clone();
@@ -421,12 +561,20 @@ async fn perform_download(state: Arc<AppState>, info: VersionInfo, source: Strin
     if layout::is_version_installed(&base, &hash, &product) {
         let mut registry = installed_versions(&state, &product);
         if let Some(existing) = registry.iter_mut().find(|v| hash_of(v) == hash) {
-            if source == "manual" && existing.get("source").and_then(Value::as_str) != Some("manual") {
+            if source == "manual"
+                && existing.get("source").and_then(Value::as_str) != Some("manual")
+            {
                 existing["source"] = json!("manual");
                 let existing = existing.clone();
                 let all: Vec<Value> = read_registry(&state, &product)
                     .into_iter()
-                    .map(|v| if hash_of(&v) == hash { existing.clone() } else { v })
+                    .map(|v| {
+                        if hash_of(&v) == hash {
+                            existing.clone()
+                        } else {
+                            v
+                        }
+                    })
                     .collect();
                 save_registry(&state, &product, &all);
                 return Ok(existing);
@@ -451,11 +599,18 @@ async fn perform_download(state: Arc<AppState>, info: VersionInfo, source: Strin
             "sizeBytes": size,
             "source": source,
         });
-        let mut registry: Vec<Value> = installed_versions(&state, &product).into_iter().filter(|v| hash_of(v) != hash).collect();
+        let mut registry: Vec<Value> = installed_versions(&state, &product)
+            .into_iter()
+            .filter(|v| hash_of(v) != hash)
+            .collect();
         registry.push(installed.clone());
         save_registry(&state, &product, &registry);
         progress(&state, &info, "complete", 100, None);
-        let label = if product == "studio" { "Roblox Studio" } else { "Roblox" };
+        let label = if product == "studio" {
+            "Roblox Studio"
+        } else {
+            "Roblox"
+        };
         tracing::info!("Successfully installed {label} {} ({hash})", info.version);
         Ok(installed)
     }
@@ -467,7 +622,11 @@ async fn perform_download(state: Arc<AppState>, info: VersionInfo, source: Strin
 }
 
 /// `downloadVersion`: concurrent requests for one build share a download.
-pub async fn download_version(state: &Arc<AppState>, info: VersionInfo, source: &str) -> AppResult<Value> {
+pub async fn download_version(
+    state: &Arc<AppState>,
+    info: VersionInfo,
+    source: &str,
+) -> AppResult<Value> {
     let key = format!("{}:{}", info.product, info.client_version_upload);
     let shared = {
         let mut active = state.versions.active.lock();
@@ -476,7 +635,13 @@ pub async fn download_version(state: &Arc<AppState>, info: VersionInfo, source: 
             .or_insert_with(|| {
                 let state = Arc::clone(state);
                 let source = source.to_owned();
-                async move { perform_download(state, info, source).await.map_err(|e| e.to_string()) }.boxed().shared()
+                async move {
+                    perform_download(state, info, source)
+                        .await
+                        .map_err(|e| e.to_string())
+                }
+                .boxed()
+                .shared()
             })
             .clone()
     };
@@ -498,7 +663,10 @@ async fn remove_version(state: &AppState, hash: &str, product: &str) -> AppResul
     if dir.exists() {
         tokio::fs::remove_dir_all(&dir).await?;
     }
-    let remaining: Vec<Value> = installed_versions(state, product).into_iter().filter(|v| hash_of(v) != hash).collect();
+    let remaining: Vec<Value> = installed_versions(state, product)
+        .into_iter()
+        .filter(|v| hash_of(v) != hash)
+        .collect();
     save_registry(state, product, &remaining);
     tracing::info!("Removed {product} version {hash}");
     Ok(())
@@ -507,21 +675,29 @@ async fn remove_version(state: &AppState, hash: &str, product: &str) -> AppResul
 async fn check_for_update(state: &AppState, channel: &str, product: &str) -> AppResult<Value> {
     let latest = match latest_or_unavailable(state, channel, product).await? {
         Ok(latest) => latest,
-        Err(ChannelUnavailable) => return Ok(json!({ "status": "channelUnavailable", "channel": channel })),
+        Err(ChannelUnavailable) => {
+            return Ok(json!({ "status": "channelUnavailable", "channel": channel }))
+        }
     };
     let mut installed: Vec<Value> = installed_versions(state, product)
         .into_iter()
         .filter(|v| v.get("channel").and_then(Value::as_str) == Some(channel))
         .collect();
     if installed.is_empty() {
-        return Ok(json!({ "status": "ok", "hasUpdate": true, "currentVersion": null, "latestVersion": latest }));
+        return Ok(
+            json!({ "status": "ok", "hasUpdate": true, "currentVersion": null, "latestVersion": latest }),
+        );
     }
     installed.sort_by(|a, b| {
-        b.get("installedAt").and_then(Value::as_str).cmp(&a.get("installedAt").and_then(Value::as_str))
+        b.get("installedAt")
+            .and_then(Value::as_str)
+            .cmp(&a.get("installedAt").and_then(Value::as_str))
     });
     let current = installed.swap_remove(0);
     let has_update = hash_of(&current) != latest.client_version_upload;
-    Ok(json!({ "status": "ok", "hasUpdate": has_update, "currentVersion": current, "latestVersion": latest }))
+    Ok(
+        json!({ "status": "ok", "hasUpdate": has_update, "currentVersion": current, "latestVersion": latest }),
+    )
 }
 
 fn product_arg(product: Option<String>) -> String {
@@ -613,8 +789,14 @@ mod tests {
     #[test]
     fn manifest_parsing_skips_launcher() {
         let text = "v0\nRobloxApp.zip\nabc\n10\n20\nRobloxPlayerLauncher.exe\ndef\n1\n2\nssl.zip\nghi\n3\n4\n";
-        let names: Vec<String> = parse_manifest(text, "player").into_iter().map(|p| p.name).collect();
+        let names: Vec<String> = parse_manifest(text, "player")
+            .into_iter()
+            .map(|p| p.name)
+            .collect();
         assert_eq!(names, ["RobloxApp.zip", "ssl.zip"]);
-        assert_eq!(package_url("https://cdn", "zcanary", "version-x", "ssl.zip"), "https://cdn/channel/common/version-x-ssl.zip");
+        assert_eq!(
+            package_url("https://cdn", "zcanary", "version-x", "ssl.zip"),
+            "https://cdn/channel/common/version-x-ssl.zip"
+        );
     }
 }

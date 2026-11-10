@@ -17,29 +17,46 @@ pub struct GamePreferences {
 
 /// `storedGamePreferenceSchema` (loose on unknown sections).
 fn valid_preference(p: &Value) -> bool {
-    let Some(map) = p.as_object() else { return false };
+    let Some(map) = p.as_object() else {
+        return false;
+    };
     let section_ok = |k: &str| map.get(k).is_none_or(|v| v.is_object());
-    map.get("placeId").and_then(Value::as_u64).is_some_and(|id| id > 0)
+    map.get("placeId")
+        .and_then(Value::as_u64)
+        .is_some_and(|id| id > 0)
         && map.get("updatedAt").is_some_and(Value::is_string)
         && section_ok("launch")
-        && map.get("launch").and_then(|l| l.get("preferredInstanceId")).is_none_or(Value::is_string)
+        && map
+            .get("launch")
+            .and_then(|l| l.get("preferredInstanceId"))
+            .is_none_or(Value::is_string)
         && section_ok("avatar")
         && section_ok("macros")
 }
 
 fn has_sections(p: &Map<String, Value>) -> bool {
-    p.iter().any(|(k, v)| k != "placeId" && k != "updatedAt" && !v.is_null())
+    p.iter()
+        .any(|(k, v)| k != "placeId" && k != "updatedAt" && !v.is_null())
 }
 
 impl GamePreferences {
     pub fn open(paths: &LauncherPaths) -> AppResult<Self> {
-        Ok(Self { store: JsonStore::open(&paths.settings_dir, "game-preferences")? })
+        Ok(Self {
+            store: JsonStore::open(&paths.settings_dir, "game-preferences")?,
+        })
     }
 
     /// `readStore`: drops malformed entries (rewriting the file if any).
     pub fn read(&self) -> Map<String, Value> {
-        let all = self.store.read("games", |v| v.and_then(Value::as_object).cloned()).unwrap_or_default();
-        let valid: Map<String, Value> = all.iter().filter(|(_, v)| valid_preference(v)).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let all = self
+            .store
+            .read("games", |v| v.and_then(Value::as_object).cloned())
+            .unwrap_or_default();
+        let valid: Map<String, Value> = all
+            .iter()
+            .filter(|(_, v)| valid_preference(v))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
         if valid.len() != all.len() {
             self.write(&valid);
         }
@@ -47,14 +64,20 @@ impl GamePreferences {
     }
 
     pub fn write(&self, games: &Map<String, Value>) {
-        if let Err(error) = self.store.update(|root| root["games"] = Value::Object(games.clone())) {
+        if let Err(error) = self
+            .store
+            .update(|root| root["games"] = Value::Object(games.clone()))
+        {
             tracing::warn!(%error, "Failed to write game preferences");
         }
     }
 }
 
 fn to_launch(p: &Value) -> Option<Value> {
-    let id = p.pointer("/launch/preferredInstanceId").and_then(Value::as_str).filter(|s| !s.is_empty())?;
+    let id = p
+        .pointer("/launch/preferredInstanceId")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())?;
     Some(json!({ "placeId": p.get("placeId"), "instanceId": id, "updatedAt": p.get("updatedAt") }))
 }
 

@@ -57,8 +57,15 @@ pub async fn details(ctx: &Ctx, universe_ids: &[u64]) -> AppResult<Vec<Value>> {
     if universe_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let url = format!("{}/games?universeIds={}", endpoints::GAMES_V1, join_ids(universe_ids));
+    let url = format!(
+        "{}/games?universeIds={}",
+        endpoints::GAMES_V1,
+        join_ids(universe_ids)
+    );
     let envelope: DataEnvelope<Value> = ctx.state.roblox.get(&url).await?;
+    ctx.state
+        .game_communities
+        .record_games(&ctx.state, &envelope.data);
     Ok(envelope.data)
 }
 
@@ -67,7 +74,11 @@ async fn votes(ctx: &Ctx, universe_ids: &[u64]) -> AppResult<BTreeMap<String, Va
     if universe_ids.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let url = format!("{}/games/votes?universeIds={}", endpoints::GAMES_V1, join_ids(universe_ids));
+    let url = format!(
+        "{}/games/votes?universeIds={}",
+        endpoints::GAMES_V1,
+        join_ids(universe_ids)
+    );
     let envelope: DataEnvelope<VoteEntry> = ctx.state.roblox.get(&url).await?;
     Ok(envelope
         .data
@@ -81,8 +92,17 @@ async fn votes(ctx: &Ctx, universe_ids: &[u64]) -> AppResult<BTreeMap<String, Va
 }
 
 /// Square game icons, cached (`getGameThumbnails`).
-pub async fn icons(ctx: &Ctx, universe_ids: &[u64], size: &str) -> AppResult<BTreeMap<String, String>> {
-    let query = IdQuery { kind: "GameIcon", size, format: "Png", include_profile_frame: None };
+pub async fn icons(
+    ctx: &Ctx,
+    universe_ids: &[u64],
+    size: &str,
+) -> AppResult<BTreeMap<String, String>> {
+    let query = IdQuery {
+        kind: "GameIcon",
+        size,
+        format: "Png",
+        include_profile_frame: None,
+    };
     let roblox = &ctx.state.roblox;
     ctx.state
         .thumbnails
@@ -102,8 +122,17 @@ pub async fn icons(ctx: &Ctx, universe_ids: &[u64], size: &str) -> AppResult<BTr
 }
 
 /// 16:9 game artwork, cached (`getGameWideThumbnails`).
-pub async fn wide_thumbnails(ctx: &Ctx, universe_ids: &[u64], size: &str) -> AppResult<BTreeMap<String, String>> {
-    let query = IdQuery { kind: "GameThumbnail", size, format: "Webp", include_profile_frame: None };
+pub async fn wide_thumbnails(
+    ctx: &Ctx,
+    universe_ids: &[u64],
+    size: &str,
+) -> AppResult<BTreeMap<String, String>> {
+    let query = IdQuery {
+        kind: "GameThumbnail",
+        size,
+        format: "Webp",
+        include_profile_frame: None,
+    };
     let roblox = &ctx.state.roblox;
     ctx.state
         .thumbnails
@@ -145,7 +174,10 @@ async fn universe_by_place(ctx: &Ctx, place_id: u64) -> Option<u64> {
 }
 
 async fn user_games(ctx: &Ctx, user_id: u64) -> AppResult<Vec<Value>> {
-    let url = format!("{}/users/{user_id}/games?accessFilter=2&sortOrder=Asc&limit=25", endpoints::GAMES_V2);
+    let url = format!(
+        "{}/users/{user_id}/games?accessFilter=2&sortOrder=Asc&limit=25",
+        endpoints::GAMES_V2
+    );
     let envelope: DataEnvelope<Value> = ctx.state.roblox.get(&url).await?;
     Ok(envelope.data)
 }
@@ -162,12 +194,16 @@ pub fn register(router: &mut Router) {
         })
         .handle("games:getThumbnails", |ctx, args| async move {
             let ids: Vec<u64> = args.get(0)?;
-            let size = args.opt::<String>(1)?.unwrap_or_else(|| "512x512".to_owned());
+            let size = args
+                .opt::<String>(1)?
+                .unwrap_or_else(|| "512x512".to_owned());
             icons(&ctx, &ids, &size).await
         })
         .handle("games:getWideThumbnails", |ctx, args| async move {
             let ids: Vec<u64> = args.get(0)?;
-            let size = args.opt::<String>(1)?.unwrap_or_else(|| "576x324".to_owned());
+            let size = args
+                .opt::<String>(1)?
+                .unwrap_or_else(|| "576x324".to_owned());
             wide_thumbnails(&ctx, &ids, &size).await
         })
         .handle("games:getUniverseByPlace", |ctx, args| async move {

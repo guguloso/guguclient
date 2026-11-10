@@ -38,19 +38,31 @@ pub struct FeatureFlagService {
 fn normalize(input: Option<&Value>) -> Map<String, Value> {
     input
         .and_then(Value::as_object)
-        .map(|m| m.iter().filter(|(_, v)| v.is_boolean()).map(|(k, v)| (k.clone(), v.clone())).collect())
+        .map(|m| {
+            m.iter()
+                .filter(|(_, v)| v.is_boolean())
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
 fn resolve(server: &Map<String, Value>, overrides: &[Option<bool>; DEFAULTS.len()]) -> Flags {
     std::array::from_fn(|i| {
         let (key, default) = DEFAULTS[i];
-        overrides[i].or_else(|| server.get(key).and_then(Value::as_bool)).unwrap_or(default)
+        overrides[i]
+            .or_else(|| server.get(key).and_then(Value::as_bool))
+            .unwrap_or(default)
     })
 }
 
 fn summarize(flags: &Flags) -> String {
-    let off: Vec<&str> = DEFAULTS.iter().zip(flags).filter(|(_, on)| !**on).map(|((k, _), _)| *k).collect();
+    let off: Vec<&str> = DEFAULTS
+        .iter()
+        .zip(flags)
+        .filter(|(_, on)| !**on)
+        .map(|((k, _), _)| *k)
+        .collect();
     if off.is_empty() {
         "all on".to_owned()
     } else {
@@ -61,7 +73,9 @@ fn summarize(flags: &Flags) -> String {
 #[cfg(debug_assertions)]
 fn load_dev_overrides() -> [Option<bool>; DEFAULTS.len()] {
     let mut overrides = [None; DEFAULTS.len()];
-    let Ok(raw) = std::env::var(OVERRIDE_ENV) else { return overrides };
+    let Ok(raw) = std::env::var(OVERRIDE_ENV) else {
+        return overrides;
+    };
     for entry in raw.split(',').map(str::trim).filter(|e| !e.is_empty()) {
         let Some((key, value)) = entry.split_once('=') else {
             tracing::warn!("[FeatureFlags] Ignoring invalid override entries: {entry}");
@@ -77,7 +91,10 @@ fn load_dev_overrides() -> [Option<bool>; DEFAULTS.len()] {
         };
         match DEFAULTS.iter().position(|(k, _)| *k == key.trim()) {
             Some(i) => overrides[i] = Some(value),
-            None => tracing::warn!("[FeatureFlags] Ignoring override keys outside the registry: {}", key.trim()),
+            None => tracing::warn!(
+                "[FeatureFlags] Ignoring override keys outside the registry: {}",
+                key.trim()
+            ),
         }
     }
     overrides
@@ -89,7 +106,13 @@ fn load_dev_overrides() -> [Option<bool>; DEFAULTS.len()] {
 }
 
 fn to_json(flags: &Flags) -> Value {
-    Value::Object(DEFAULTS.iter().zip(flags).map(|((k, _), v)| ((*k).to_owned(), Value::Bool(*v))).collect())
+    Value::Object(
+        DEFAULTS
+            .iter()
+            .zip(flags)
+            .map(|((k, _), v)| ((*k).to_owned(), Value::Bool(*v)))
+            .collect(),
+    )
 }
 
 impl FeatureFlagService {
@@ -100,8 +123,14 @@ impl FeatureFlagService {
         let overrides = load_dev_overrides();
         let resolved = resolve(&server, &overrides);
         let source = if entry.is_some() { "cache" } else { "defaults" };
-        tracing::info!("[FeatureFlags] Initialized from {source}: {}", summarize(&resolved));
-        Self { resolved: RwLock::new(resolved), overrides }
+        tracing::info!(
+            "[FeatureFlags] Initialized from {source}: {}",
+            summarize(&resolved)
+        );
+        Self {
+            resolved: RwLock::new(resolved),
+            overrides,
+        }
     }
 
     pub fn all(&self) -> Value {
@@ -111,7 +140,10 @@ impl FeatureFlagService {
     #[allow(dead_code)] // read by gated services in later phases
     pub fn is_enabled(&self, key: &str) -> bool {
         let flags = self.resolved.read();
-        DEFAULTS.iter().position(|(k, _)| *k == key).is_some_and(|i| flags[i])
+        DEFAULTS
+            .iter()
+            .position(|(k, _)| *k == key)
+            .is_some_and(|i| flags[i])
     }
 
     /// `processIncomingFlags`: `None` (server failed to evaluate) keeps the
@@ -122,7 +154,10 @@ impl FeatureFlagService {
             return;
         };
         let server = normalize(Some(flags));
-        if let Err(error) = cache.set(CACHE_KEY, json!({ "fetchedAt": now_millis(), "flags": server })) {
+        if let Err(error) = cache.set(
+            CACHE_KEY,
+            json!({ "fetchedAt": now_millis(), "flags": server }),
+        ) {
             tracing::warn!(%error, "[FeatureFlags] Failed to persist the server map");
         }
         let next = resolve(&server, &self.overrides);
@@ -145,7 +180,9 @@ impl FeatureFlagService {
 }
 
 pub fn register(router: &mut Router) {
-    router.handle("featureFlags:getAll", |ctx, _| async move { Ok(ctx.state.feature_flags.all()) });
+    router.handle("featureFlags:getAll", |ctx, _| async move {
+        Ok(ctx.state.feature_flags.all())
+    });
 }
 
 #[cfg(test)]
@@ -154,7 +191,9 @@ mod tests {
 
     #[test]
     fn override_beats_server_beats_default() {
-        let server = normalize(Some(&json!({ "feature-ads": false, "page-macros": "nope", "unknown": false })));
+        let server = normalize(Some(
+            &json!({ "feature-ads": false, "page-macros": "nope", "unknown": false }),
+        ));
         let mut overrides = [None; DEFAULTS.len()];
         overrides[1] = Some(false);
         let flags = resolve(&server, &overrides);

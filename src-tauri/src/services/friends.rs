@@ -7,8 +7,8 @@ use serde_json::{json, Value};
 
 use crate::error::AppResult;
 use crate::ipc::Router;
-use crate::state::AppState;
 use crate::roblox::endpoints;
+use crate::state::AppState;
 
 const FRIEND_STATUSES: [&str; 4] = ["NotFriends", "Friends", "RequestSent", "RequestReceived"];
 
@@ -61,8 +61,14 @@ async fn fetch_user_details(state: &AppState, user_ids: Vec<u64>) -> HashMap<u64
                     Some((
                         id,
                         Names {
-                            name: names.map(|n| str_of(n, "username")).unwrap_or_default().to_owned(),
-                            display_name: names.map(|n| str_of(n, "combinedName")).unwrap_or_default().to_owned(),
+                            name: names
+                                .map(|n| str_of(n, "username"))
+                                .unwrap_or_default()
+                                .to_owned(),
+                            display_name: names
+                                .map(|n| str_of(n, "combinedName"))
+                                .unwrap_or_default()
+                                .to_owned(),
                         },
                     ))
                 })
@@ -78,7 +84,11 @@ fn needs_names(f: &Value) -> Option<u64> {
 }
 
 fn first_non_empty<'a>(options: &[&'a str]) -> &'a str {
-    options.iter().copied().find(|s| !s.is_empty()).unwrap_or_default()
+    options
+        .iter()
+        .copied()
+        .find(|s| !s.is_empty())
+        .unwrap_or_default()
 }
 
 pub async fn list_friends(state: &AppState, user_id: u64) -> Vec<Value> {
@@ -96,8 +106,15 @@ pub async fn list_friends(state: &AppState, user_id: u64) -> Vec<Value> {
         .map(|f| {
             let id = u64_of(f, "id").unwrap_or(0);
             let d = details.get(&id);
-            let name = first_non_empty(&[d.map_or("", |d| d.name.as_str()), str_of(f, "name"), str_of(f, "displayName")]);
-            let display = first_non_empty(&[d.map_or("", |d| d.display_name.as_str()), str_of(f, "displayName")]);
+            let name = first_non_empty(&[
+                d.map_or("", |d| d.name.as_str()),
+                str_of(f, "name"),
+                str_of(f, "displayName"),
+            ]);
+            let display = first_non_empty(&[
+                d.map_or("", |d| d.display_name.as_str()),
+                str_of(f, "displayName"),
+            ]);
             let online = f.get("isOnline").and_then(Value::as_bool).unwrap_or(false);
             json!({
                 "id": id,
@@ -190,7 +207,10 @@ pub async fn get_friend_requests(state: &AppState) -> Vec<Value> {
 
 async fn check_friend_status(state: &AppState, user_id: u64) -> Option<String> {
     let me = state.auth.current_user_id()?;
-    let url = format!("{}/users/{me}/friends/statuses?userIds={user_id}", endpoints::FRIENDS_V1);
+    let url = format!(
+        "{}/users/{me}/friends/statuses?userIds={user_id}",
+        endpoints::FRIENDS_V1
+    );
     match state.roblox.get::<Value>(&url).await {
         Ok(body) => body
             .pointer("/data/0/status")
@@ -206,8 +226,15 @@ async fn check_friend_status(state: &AppState, user_id: u64) -> Option<String> {
 
 async fn is_following(state: &AppState, user_id: u64) -> bool {
     let url = format!("{}/user/following-exists", endpoints::FRIENDS_V1);
-    match state.roblox.post::<_, Value>(&url, &json!({ "targetUserIds": [user_id] })).await {
-        Ok(body) => body.pointer("/followings/0/isFollowing").and_then(Value::as_bool).unwrap_or(false),
+    match state
+        .roblox
+        .post::<_, Value>(&url, &json!({ "targetUserIds": [user_id] }))
+        .await
+    {
+        Ok(body) => body
+            .pointer("/followings/0/isFollowing")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         Err(error) => {
             tracing::error!(user_id, %error, "Failed to get following status");
             false
@@ -276,21 +303,43 @@ pub fn register(router: &mut Router) {
             let user_id: u64 = args.get(0)?;
             Ok(get_online_friends(&ctx.state, user_id).await)
         })
-        .handle("friends:getFriendRequests", |ctx, _| async move { Ok(get_friend_requests(&ctx.state).await) })
+        .handle("friends:getFriendRequests", |ctx, _| async move {
+            Ok(get_friend_requests(&ctx.state).await)
+        })
         .handle("friends:acceptFriendRequest", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx.state, format!("/users/{id}/accept-friend-request"), None).await
+            post_action(
+                &ctx.state,
+                format!("/users/{id}/accept-friend-request"),
+                None,
+            )
+            .await
         })
         .handle("friends:declineFriendRequest", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx.state, format!("/users/{id}/decline-friend-request"), None).await
+            post_action(
+                &ctx.state,
+                format!("/users/{id}/decline-friend-request"),
+                None,
+            )
+            .await
         })
         .handle("friends:declineAllFriendRequests", |ctx, _| async move {
-            post_action(&ctx.state, "/user/friend-requests/decline-all".to_owned(), Some(json!({}))).await
+            post_action(
+                &ctx.state,
+                "/user/friend-requests/decline-all".to_owned(),
+                Some(json!({})),
+            )
+            .await
         })
         .handle("friends:sendFriendRequest", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx.state, format!("/users/{id}/request-friendship"), Some(json!({}))).await
+            post_action(
+                &ctx.state,
+                format!("/users/{id}/request-friendship"),
+                Some(json!({})),
+            )
+            .await
         })
         .handle("friends:unfriend", |ctx, args| async move {
             let id: u64 = args.get(0)?;
@@ -314,7 +363,9 @@ pub fn register(router: &mut Router) {
         })
         .handle("friends:getFriendStatus", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            Ok(check_friend_status(&ctx.state, id).await.unwrap_or_else(|| "NotFriends".to_owned()))
+            Ok(check_friend_status(&ctx.state, id)
+                .await
+                .unwrap_or_else(|| "NotFriends".to_owned()))
         })
         .handle("friends:searchFriends", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;

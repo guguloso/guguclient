@@ -21,8 +21,8 @@ use crate::error::AppResult;
 use crate::ipc::{EventBus, Router};
 use crate::paths::LauncherPaths;
 use crate::services::friends;
-use crate::services::thumbnails::{from_persisted_url, to_persisted_url};
 use crate::services::poller::{Ladder, PollJob, Poller, Tier, FOREVER};
+use crate::services::thumbnails::{from_persisted_url, to_persisted_url};
 use crate::state::AppState;
 use crate::store::JsonStore;
 use crate::util::{now_iso, now_millis};
@@ -35,12 +35,27 @@ const CACHE_STORE_NAME: &str = "social-cache";
 const CACHE_WRITE_DEBOUNCE: Duration = Duration::from_millis(1_000);
 
 const FRIENDS_LADDER: Ladder = &[
-    Tier { interval_ms: 30_000, duration_ms: 60_000 },
-    Tier { interval_ms: 300_000, duration_ms: FOREVER },
+    Tier {
+        interval_ms: 30_000,
+        duration_ms: 60_000,
+    },
+    Tier {
+        interval_ms: 300_000,
+        duration_ms: FOREVER,
+    },
 ];
-const FRIENDS_BACKGROUND_LADDER: Ladder = &[Tier { interval_ms: 600_000, duration_ms: FOREVER }];
-const PRESENCE_LADDER: Ladder = &[Tier { interval_ms: 30_000, duration_ms: FOREVER }];
-const PRESENCE_BACKGROUND_LADDER: Ladder = &[Tier { interval_ms: 180_000, duration_ms: FOREVER }];
+const FRIENDS_BACKGROUND_LADDER: Ladder = &[Tier {
+    interval_ms: 600_000,
+    duration_ms: FOREVER,
+}];
+const PRESENCE_LADDER: Ladder = &[Tier {
+    interval_ms: 30_000,
+    duration_ms: FOREVER,
+}];
+const PRESENCE_BACKGROUND_LADDER: Ladder = &[Tier {
+    interval_ms: 180_000,
+    duration_ms: FOREVER,
+}];
 
 // ------------------------------------------------------------------ cache
 
@@ -61,7 +76,11 @@ pub struct SocialCache {
 }
 
 fn merged(previous: Option<&Value>, key: &str, patch: Option<Map<String, Value>>) -> Value {
-    let mut base = previous.and_then(|p| p.get(key)).and_then(Value::as_object).cloned().unwrap_or_default();
+    let mut base = previous
+        .and_then(|p| p.get(key))
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
     if let Some(patch) = patch {
         base.extend(patch);
     }
@@ -69,17 +88,29 @@ fn merged(previous: Option<&Value>, key: &str, patch: Option<Map<String, Value>>
 }
 
 fn to_record<V: serde::Serialize>(map: &BTreeMap<u64, V>) -> Map<String, Value> {
-    map.iter().map(|(k, v)| (k.to_string(), serde_json::to_value(v).unwrap_or(Value::Null))).collect()
+    map.iter()
+        .map(|(k, v)| {
+            (
+                k.to_string(),
+                serde_json::to_value(v).unwrap_or(Value::Null),
+            )
+        })
+        .collect()
 }
 
 impl SocialCache {
     fn open(paths: &LauncherPaths) -> AppResult<Arc<Self>> {
         let store = JsonStore::open(&paths.settings_dir, CACHE_STORE_NAME)?;
-        Ok(Arc::new(Self { store, pending: Mutex::new(HashMap::new()), flush_scheduled: AtomicBool::new(false) }))
+        Ok(Arc::new(Self {
+            store,
+            pending: Mutex::new(HashMap::new()),
+            flush_scheduled: AtomicBool::new(false),
+        }))
     }
 
     fn read_from_disk(&self, user_id: u64) -> Option<Value> {
-        self.store.read(&format!("byUser.{user_id}"), |v| v.cloned())
+        self.store
+            .read(&format!("byUser.{user_id}"), |v| v.cloned())
     }
 
     /// Snapshot as stored (Electron URL scheme), pending writes first.
@@ -108,7 +139,10 @@ impl SocialCache {
         let previous = previous.as_ref();
         let list = |key: &str, new: Option<&[Value]>| match new {
             Some(items) => Value::Array(items.to_vec()),
-            None => previous.and_then(|p| p.get(key)).cloned().unwrap_or_else(|| json!([])),
+            None => previous
+                .and_then(|p| p.get(key))
+                .cloned()
+                .unwrap_or_else(|| json!([])),
         };
         let next = json!({
             "friends": list("friends", patch.friends),
@@ -193,7 +227,9 @@ fn friend_signature(f: &Value) -> String {
         str_field(f, "displayName"),
         u8::from(f.get("isOnline").and_then(Value::as_bool).unwrap_or(false)),
         u8::from(f.get("isDeleted").and_then(Value::as_bool).unwrap_or(false)),
-        f.get("presenceType").map(Value::to_string).unwrap_or_default(),
+        f.get("presenceType")
+            .map(Value::to_string)
+            .unwrap_or_default(),
     )
 }
 
@@ -204,7 +240,9 @@ fn request_signature(r: &Value) -> String {
         r.get("id").map(Value::to_string).unwrap_or_default(),
         r.get("senderId").map(Value::to_string).unwrap_or_default(),
         sender.map(|s| str_field(s, "name")).unwrap_or_default(),
-        sender.map(|s| str_field(s, "displayName")).unwrap_or_default(),
+        sender
+            .map(|s| str_field(s, "displayName"))
+            .unwrap_or_default(),
         str_field(r, "sentAt"),
     )
 }
@@ -221,25 +259,43 @@ fn is_online(presence: Option<&Value>) -> bool {
     presence.is_some_and(|p| presence_type(p) != Some(PRESENCE_TYPE_OFFLINE))
 }
 
-const PRESENCE_DIFF_FIELDS: [&str; 7] =
-    ["userPresenceType", "placeId", "universeId", "rootPlaceId", "gameId", "lastLocation", "lastOnline"];
+const PRESENCE_DIFF_FIELDS: [&str; 7] = [
+    "userPresenceType",
+    "placeId",
+    "universeId",
+    "rootPlaceId",
+    "gameId",
+    "lastLocation",
+    "lastOnline",
+];
 
 /// `diffPresence`: changed records plus users who just went offline.
-fn diff_presence(previous: &HashMap<u64, Value>, incoming: &[Value]) -> (Vec<Value>, BTreeMap<u64, Value>) {
+fn diff_presence(
+    previous: &HashMap<u64, Value>,
+    incoming: &[Value],
+) -> (Vec<Value>, BTreeMap<u64, Value>) {
     let mut changes = Vec::new();
     let mut newly_offline = BTreeMap::new();
     for presence in incoming {
-        let Some(user_id) = user_id_of(presence) else { continue };
+        let Some(user_id) = user_id_of(presence) else {
+            continue;
+        };
         let Some(prior) = previous.get(&user_id) else {
             changes.push(json!({ "userId": user_id, "presence": presence }));
             continue;
         };
-        if PRESENCE_DIFF_FIELDS.iter().any(|k| prior.get(k) != presence.get(k)) {
+        if PRESENCE_DIFF_FIELDS
+            .iter()
+            .any(|k| prior.get(k) != presence.get(k))
+        {
             changes.push(json!({ "userId": user_id, "presence": presence }));
         }
-        let went_offline =
-            presence_type(prior) != Some(PRESENCE_TYPE_OFFLINE) && presence_type(presence) == Some(PRESENCE_TYPE_OFFLINE);
-        if let (true, Some(last_online)) = (went_offline, presence.get("lastOnline").filter(|v| truthy(v))) {
+        let went_offline = presence_type(prior) != Some(PRESENCE_TYPE_OFFLINE)
+            && presence_type(presence) == Some(PRESENCE_TYPE_OFFLINE);
+        if let (true, Some(last_online)) = (
+            went_offline,
+            presence.get("lastOnline").filter(|v| truthy(v)),
+        ) {
             newly_offline.insert(user_id, last_online.clone());
         }
     }
@@ -256,17 +312,34 @@ fn truthy(v: &Value) -> bool {
 }
 
 /// `captureLastGames`: new in-game sessions keyed by user.
-fn capture_last_games(incoming: &[Value], last_games: &BTreeMap<u64, Value>, now: &str) -> BTreeMap<u64, Value> {
+fn capture_last_games(
+    incoming: &[Value],
+    last_games: &BTreeMap<u64, Value>,
+    now: &str,
+) -> BTreeMap<u64, Value> {
     let mut updates = BTreeMap::new();
     for presence in incoming {
-        let Some(user_id) = user_id_of(presence) else { continue };
+        let Some(user_id) = user_id_of(presence) else {
+            continue;
+        };
         let universe = presence.get("universeId").filter(|v| !v.is_null());
-        let (Some(universe), Some(PRESENCE_TYPE_IN_GAME)) = (universe, presence_type(presence)) else { continue };
+        let (Some(universe), Some(PRESENCE_TYPE_IN_GAME)) = (universe, presence_type(presence))
+        else {
+            continue;
+        };
         if last_games.get(&user_id).and_then(|g| g.get("universeId")) == Some(universe) {
             continue;
         }
-        let location = presence.get("lastLocation").and_then(Value::as_str).map(str::trim).unwrap_or_default();
-        let name = if location.is_empty() { format!("Game {universe}") } else { location.to_owned() };
+        let location = presence
+            .get("lastLocation")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or_default();
+        let name = if location.is_empty() {
+            format!("Game {universe}")
+        } else {
+            location.to_owned()
+        };
         let or_null = |key: &str| presence.get(key).cloned().unwrap_or(Value::Null);
         updates.insert(
             user_id,
@@ -287,8 +360,16 @@ impl SocialService {
         Ok(Self {
             cache: SocialCache::open(paths)?,
             data: Mutex::new(SocialData::default()),
-            friends_poller: Poller::new("social-friends", FRIENDS_LADDER, Some(FRIENDS_BACKGROUND_LADDER)),
-            presence_poller: Poller::new("social-presence", PRESENCE_LADDER, Some(PRESENCE_BACKGROUND_LADDER)),
+            friends_poller: Poller::new(
+                "social-friends",
+                FRIENDS_LADDER,
+                Some(FRIENDS_BACKGROUND_LADDER),
+            ),
+            presence_poller: Poller::new(
+                "social-presence",
+                PRESENCE_LADDER,
+                Some(PRESENCE_BACKGROUND_LADDER),
+            ),
             started: AtomicBool::new(false),
         })
     }
@@ -320,7 +401,8 @@ impl SocialService {
 
     fn start_pollers(&self, state: &Arc<AppState>) {
         let weak = Arc::downgrade(state);
-        self.friends_poller.start(Arc::new(FriendsJob(weak.clone())));
+        self.friends_poller
+            .start(Arc::new(FriendsJob(weak.clone())));
         self.presence_poller.start(Arc::new(PresenceJob(weak)));
     }
 
@@ -345,13 +427,25 @@ impl SocialService {
     }
 
     fn hydrate(&self, user_id: Option<u64>) {
-        let Some(snapshot) = user_id.and_then(|id| self.cache.snapshot(id)) else { return };
-        let list = |key: &str| snapshot.get(key).and_then(Value::as_array).cloned().unwrap_or_default();
+        let Some(snapshot) = user_id.and_then(|id| self.cache.snapshot(id)) else {
+            return;
+        };
+        let list = |key: &str| {
+            snapshot
+                .get(key)
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        };
         let record = |key: &str| -> BTreeMap<u64, Value> {
             snapshot
                 .get(key)
                 .and_then(Value::as_object)
-                .map(|m| m.iter().filter_map(|(k, v)| Some((k.parse().ok()?, v.clone()))).collect())
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| Some((k.parse().ok()?, v.clone())))
+                        .collect()
+                })
                 .unwrap_or_default()
         };
         let mut data = self.data.lock();
@@ -373,14 +467,22 @@ struct PresenceJob(Weak<AppState>);
 
 impl PollJob for FriendsJob {
     fn should_run(&self) -> bool {
-        self.0.upgrade().is_some_and(|s| s.auth.current_user_id().is_some())
+        self.0
+            .upgrade()
+            .is_some_and(|s| s.auth.current_user_id().is_some())
     }
 
     async fn run(&self) -> AppResult<()> {
-        let Some(state) = self.0.upgrade() else { return Ok(()) };
-        let Some(user_id) = state.auth.current_user_id() else { return Ok(()) };
-        let (friends, requests) =
-            futures::join!(friends::list_friends(&state, user_id), friends::get_friend_requests(&state));
+        let Some(state) = self.0.upgrade() else {
+            return Ok(());
+        };
+        let Some(user_id) = state.auth.current_user_id() else {
+            return Ok(());
+        };
+        let (friends, requests) = futures::join!(
+            friends::list_friends(&state, user_id),
+            friends::get_friend_requests(&state)
+        );
 
         let missing: Vec<u64> = {
             let data = state.social.data.lock();
@@ -389,16 +491,27 @@ impl PollJob for FriendsJob {
                 .iter()
                 .filter_map(|f| f.get("id").and_then(Value::as_u64))
                 .chain(requests.iter().filter_map(|r| {
-                    r.get("senderId").and_then(Value::as_u64).or_else(|| r.pointer("/sender/id").and_then(Value::as_u64))
+                    r.get("senderId")
+                        .and_then(Value::as_u64)
+                        .or_else(|| r.pointer("/sender/id").and_then(Value::as_u64))
                 }))
                 .filter(|id| *id > 0 && seen.insert(*id) && !data.avatars.contains_key(id))
                 .collect()
         };
         let mut avatars = BTreeMap::new();
         if !missing.is_empty() {
-            match state.auth.headshots(&state.thumbnails, &missing, AVATAR_HEADSHOT_SIZE, true).await {
-                Ok(map) => avatars.extend(map.into_iter().filter_map(|(k, v)| Some((k.parse().ok()?, v)))),
-                Err(error) => tracing::warn!(%error, "[SocialPoller] Failed to fetch avatar headshots"),
+            match state
+                .auth
+                .headshots(&state.thumbnails, &missing, AVATAR_HEADSHOT_SIZE, true)
+                .await
+            {
+                Ok(map) => avatars.extend(
+                    map.into_iter()
+                        .filter_map(|(k, v)| Some((k.parse().ok()?, v))),
+                ),
+                Err(error) => {
+                    tracing::warn!(%error, "[SocialPoller] Failed to fetch avatar headshots")
+                }
             }
         }
         handle_friends_result(&state, user_id, friends, requests, avatars);
@@ -420,8 +533,15 @@ fn handle_friends_result(
     let events: &EventBus = &state.events;
     let mut data = social.data.lock();
 
-    let incoming: HashSet<u64> = friends.iter().filter_map(|f| f.get("id").and_then(Value::as_u64)).collect();
-    let previous: Vec<u64> = data.friends.iter().filter_map(|f| f.get("id").and_then(Value::as_u64)).collect();
+    let incoming: HashSet<u64> = friends
+        .iter()
+        .filter_map(|f| f.get("id").and_then(Value::as_u64))
+        .collect();
+    let previous: Vec<u64> = data
+        .friends
+        .iter()
+        .filter_map(|f| f.get("id").and_then(Value::as_u64))
+        .collect();
     data.friends = friends;
     data.friend_requests = requests;
 
@@ -447,7 +567,10 @@ fn handle_friends_result(
     let request_sigs: Vec<String> = data.friend_requests.iter().map(request_signature).collect();
     if data.last_broadcast_requests.as_ref() != Some(&request_sigs) {
         data.last_broadcast_requests = Some(request_sigs);
-        events.emit("social:friendRequestsChanged", json!({ "requests": data.friend_requests }));
+        events.emit(
+            "social:friendRequestsChanged",
+            json!({ "requests": data.friend_requests }),
+        );
     }
     if avatars_changed {
         events.emit("social:avatarsChanged", json!({ "avatars": data.avatars }));
@@ -469,25 +592,33 @@ fn handle_friends_result(
 
 impl PollJob for PresenceJob {
     fn should_run(&self) -> bool {
-        self.0
-            .upgrade()
-            .is_some_and(|s| s.auth.current_user_id().is_some() && !s.social.data.lock().friends.is_empty())
+        self.0.upgrade().is_some_and(|s| {
+            s.auth.current_user_id().is_some() && !s.social.data.lock().friends.is_empty()
+        })
     }
 
     async fn run(&self) -> AppResult<()> {
-        let Some(state) = self.0.upgrade() else { return Ok(()) };
+        let Some(state) = self.0.upgrade() else {
+            return Ok(());
+        };
         let ids = {
             let mut data = state.social.data.lock();
             if data.friends.is_empty() {
                 return Ok(());
             }
-            let all: Vec<u64> = data.friends.iter().filter_map(|f| f.get("id").and_then(Value::as_u64)).collect();
+            let all: Vec<u64> = data
+                .friends
+                .iter()
+                .filter_map(|f| f.get("id").and_then(Value::as_u64))
+                .collect();
             let include_offline = data.presence_tick % OFFLINE_TICK_RATIO == 0;
             data.presence_tick += 1;
             if include_offline {
                 all
             } else {
-                all.into_iter().filter(|id| is_online(data.presence.get(id))).collect()
+                all.into_iter()
+                    .filter(|id| is_online(data.presence.get(id)))
+                    .collect()
             }
         };
         if ids.is_empty() {
@@ -500,7 +631,9 @@ impl PollJob for PresenceJob {
 }
 
 fn handle_presence_result(state: &AppState, incoming: &[Value]) {
-    let Some(user_id) = state.auth.current_user_id() else { return };
+    let Some(user_id) = state.auth.current_user_id() else {
+        return;
+    };
     let social = &state.social;
     let mut data = social.data.lock();
     let now = now_iso();
@@ -512,17 +645,39 @@ fn handle_presence_result(state: &AppState, incoming: &[Value]) {
         }
     }
     if !changes.is_empty() {
-        state.events.emit("social:presenceChanged", json!({ "changes": changes }));
+        state
+            .events
+            .emit("social:presenceChanged", json!({ "changes": changes }));
     }
     if !newly_offline.is_empty() {
-        data.last_seen.extend(newly_offline.iter().map(|(k, v)| (*k, v.clone())));
-        state.events.emit("social:lastSeenChanged", json!({ "lastSeen": data.last_seen }));
-        social.cache.update(user_id, SnapshotPatch { last_seen: Some(&newly_offline), ..SnapshotPatch::default() });
+        data.last_seen
+            .extend(newly_offline.iter().map(|(k, v)| (*k, v.clone())));
+        state.events.emit(
+            "social:lastSeenChanged",
+            json!({ "lastSeen": data.last_seen }),
+        );
+        social.cache.update(
+            user_id,
+            SnapshotPatch {
+                last_seen: Some(&newly_offline),
+                ..SnapshotPatch::default()
+            },
+        );
     }
     if !last_game_updates.is_empty() {
-        data.last_games.extend(last_game_updates.iter().map(|(k, v)| (*k, v.clone())));
-        state.events.emit("social:lastGamesChanged", json!({ "lastGames": data.last_games }));
-        social.cache.update(user_id, SnapshotPatch { last_games: Some(&last_game_updates), ..SnapshotPatch::default() });
+        data.last_games
+            .extend(last_game_updates.iter().map(|(k, v)| (*k, v.clone())));
+        state.events.emit(
+            "social:lastGamesChanged",
+            json!({ "lastGames": data.last_games }),
+        );
+        social.cache.update(
+            user_id,
+            SnapshotPatch {
+                last_games: Some(&last_game_updates),
+                ..SnapshotPatch::default()
+            },
+        );
     }
 }
 
@@ -531,7 +686,11 @@ fn handle_presence_result(state: &AppState, incoming: &[Value]) {
 pub fn register(router: &mut Router) {
     router
         .handle("social:getCachedSnapshot", |ctx, _| async move {
-            Ok(ctx.state.auth.current_user_id().and_then(|id| ctx.state.social.cache.snapshot(id)))
+            Ok(ctx
+                .state
+                .auth
+                .current_user_id()
+                .and_then(|id| ctx.state.social.cache.snapshot(id)))
         })
         .handle("socialPoller:userActed", |ctx, _| async move {
             ctx.state.social.on_user_acted();
@@ -546,7 +705,10 @@ mod tests {
     #[test]
     fn presence_diff_and_last_games() {
         let mut previous = HashMap::new();
-        previous.insert(1, json!({ "userId": 1, "userPresenceType": 2, "universeId": 10, "lastOnline": "a" }));
+        previous.insert(
+            1,
+            json!({ "userId": 1, "userPresenceType": 2, "universeId": 10, "lastOnline": "a" }),
+        );
         let incoming = [
             json!({ "userId": 1, "userPresenceType": 0, "lastOnline": "b" }),
             json!({ "userId": 2, "userPresenceType": 2, "universeId": 20, "lastLocation": "  Obby " }),

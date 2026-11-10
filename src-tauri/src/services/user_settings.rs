@@ -67,7 +67,10 @@ fn map_account_info(raw: &Value) -> Value {
 async fn web_get(state: &AppState, url: &str) -> AppResult<Value> {
     let context = state.auth.web_context().await;
     let context = context.as_ref().map(|(c, t)| (c.as_str(), t.as_str()));
-    state.roblox.request_web(Method::GET, url, None, context).await
+    state
+        .roblox
+        .request_web(Method::GET, url, None, context)
+        .await
 }
 
 impl UserSettingsService {
@@ -102,12 +105,20 @@ impl UserSettingsService {
 
     fn cached_settings(&self, active: Option<u64>) -> Option<Value> {
         let cached = self.cached.lock();
-        cached.settings.as_ref().filter(|(id, _)| Some(*id) == active).map(|(_, v)| v.clone())
+        cached
+            .settings
+            .as_ref()
+            .filter(|(id, _)| Some(*id) == active)
+            .map(|(_, v)| v.clone())
     }
 
     fn cached_account_info(&self, active: Option<u64>) -> Option<Value> {
         let cached = self.cached.lock();
-        cached.account_info.as_ref().filter(|(id, _)| Some(*id) == active).map(|(_, v)| v.clone())
+        cached
+            .account_info
+            .as_ref()
+            .filter(|(id, _)| Some(*id) == active)
+            .map(|(_, v)| v.clone())
     }
 }
 
@@ -133,7 +144,11 @@ pub async fn refresh(state: &AppState) -> (Option<Value>, Option<Value>) {
         Err(error) => {
             tracing::error!("UserSettings: Failed to refresh user-settings for {user_id}: {error}");
             let mut cached = service.cached.lock();
-            if cached.settings.as_ref().is_some_and(|(id, _)| *id != user_id) {
+            if cached
+                .settings
+                .as_ref()
+                .is_some_and(|(id, _)| *id != user_id)
+            {
                 cached.settings = None;
             }
             None
@@ -149,7 +164,11 @@ pub async fn refresh(state: &AppState) -> (Option<Value>, Option<Value>) {
         Err(error) => {
             tracing::error!("UserSettings: Failed to refresh account-info for {user_id}: {error}");
             let mut cached = service.cached.lock();
-            if cached.account_info.as_ref().is_some_and(|(id, _)| *id != user_id) {
+            if cached
+                .account_info
+                .as_ref()
+                .is_some_and(|(id, _)| *id != user_id)
+            {
                 cached.account_info = None;
             }
             None
@@ -166,8 +185,14 @@ async fn update(state: &AppState, patch: Value) -> AppResult<Value> {
     let url = format!("{}/v1/user-settings", endpoints::USER_SETTINGS_API);
     let context = state.auth.web_context().await;
     let context = context.as_ref().map(|(c, t)| (c.as_str(), t.as_str()));
-    state.roblox.request_web::<Value>(Method::POST, &url, Some(&patch), context).await?;
-    let mut next = state.user_settings.cached_settings(Some(user_id)).unwrap_or_else(|| json!({}));
+    state
+        .roblox
+        .request_web::<Value>(Method::POST, &url, Some(&patch), context)
+        .await?;
+    let mut next = state
+        .user_settings
+        .cached_settings(Some(user_id))
+        .unwrap_or_else(|| json!({}));
     if let (Some(next), Some(patch)) = (next.as_object_mut(), patch.as_object()) {
         next.extend(patch.iter().map(|(k, v)| (k.clone(), v.clone())));
     }
@@ -182,27 +207,41 @@ pub fn register(router: &mut Router) {
     router
         .handle("userSettings:get", |ctx, _| async move {
             let state = &ctx.state;
-            if let Some(cached) = state.user_settings.cached_settings(state.auth.current_user_id()) {
+            if let Some(cached) = state
+                .user_settings
+                .cached_settings(state.auth.current_user_id())
+            {
                 return Ok(Some(cached));
             }
             Ok(refresh(state).await.0)
         })
         .handle("userSettings:getCached", |ctx, _| async move {
-            Ok(ctx.state.user_settings.cached_settings(ctx.state.auth.current_user_id()))
+            Ok(ctx
+                .state
+                .user_settings
+                .cached_settings(ctx.state.auth.current_user_id()))
         })
-        .handle("userSettings:refresh", |ctx, _| async move { Ok(refresh(&ctx.state).await.0) })
+        .handle("userSettings:refresh", |ctx, _| async move {
+            Ok(refresh(&ctx.state).await.0)
+        })
         .handle("userSettings:update", |ctx, args| async move {
             let patch: Value = args.get(0)?;
             update(&ctx.state, patch).await
         })
         .handle("userSettings:getAccountInfo", |ctx, _| async move {
             let state = &ctx.state;
-            if let Some(cached) = state.user_settings.cached_account_info(state.auth.current_user_id()) {
+            if let Some(cached) = state
+                .user_settings
+                .cached_account_info(state.auth.current_user_id())
+            {
                 return Ok(Some(cached));
             }
             Ok(refresh(state).await.1)
         })
         .handle("userSettings:getCachedAccountInfo", |ctx, _| async move {
-            Ok(ctx.state.user_settings.cached_account_info(ctx.state.auth.current_user_id()))
+            Ok(ctx
+                .state
+                .user_settings
+                .cached_account_info(ctx.state.auth.current_user_id()))
         });
 }

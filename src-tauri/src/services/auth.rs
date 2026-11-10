@@ -12,9 +12,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use parking_lot::{Mutex, RwLock};
-use tokio::sync::watch;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use tokio::sync::watch;
 
 use crate::crypto::SafeStorage;
 use crate::error::{AppError, AppResult};
@@ -39,9 +39,17 @@ fn browser_tracker_from_set_cookie(header: &str) -> Option<String> {
     let raw = value
         .trim()
         .split('&')
-        .find_map(|part| part.split_once('=').filter(|(k, _)| k.eq_ignore_ascii_case("browserid")).map(|(_, v)| v))
+        .find_map(|part| {
+            part.split_once('=')
+                .filter(|(k, _)| k.eq_ignore_ascii_case("browserid"))
+                .map(|(_, v)| v)
+        })
         .filter(|v| !v.is_empty())?;
-    Some(urlencoding::decode(raw).map(|v| v.into_owned()).unwrap_or_else(|_| raw.to_owned()))
+    Some(
+        urlencoding::decode(raw)
+            .map(|v| v.into_owned())
+            .unwrap_or_else(|_| raw.to_owned()),
+    )
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -97,7 +105,11 @@ impl ValidatedUser {
         self.user.get("id").and_then(Value::as_u64).unwrap_or(0)
     }
     fn str_field(&self, key: &str) -> String {
-        self.user.get(key).and_then(Value::as_str).unwrap_or_default().to_owned()
+        self.user
+            .get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
     }
 }
 
@@ -123,14 +135,27 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub fn load(file: PathBuf, crypto: SafeStorage, roblox: Arc<RobloxClient>, events: EventBus) -> Self {
+    pub fn load(
+        file: PathBuf,
+        crypto: SafeStorage,
+        roblox: Arc<RobloxClient>,
+        events: EventBus,
+    ) -> Self {
         let data = std::fs::read(&file)
             .ok()
             .and_then(|bytes| serde_json::from_slice::<AuthFile>(&bytes).ok())
             .unwrap_or_default();
         tracing::info!(accounts = data.accounts.len(), "auth data loaded");
         let (account_tx, _) = watch::channel(data.active_user_id);
-        Self { file, data: RwLock::new(data), crypto, roblox, events, favorites: Mutex::new(HashMap::new()), account_tx }
+        Self {
+            file,
+            data: RwLock::new(data),
+            crypto,
+            roblox,
+            events,
+            favorites: Mutex::new(HashMap::new()),
+            account_tx,
+        }
     }
 
     // ------------------------------------------------------------- state
@@ -141,7 +166,8 @@ impl AuthService {
 
     pub fn is_authenticated(&self) -> bool {
         let data = self.data.read();
-        data.active_user_id.is_some_and(|id| data.accounts.iter().any(|a| a.user_id == id))
+        data.active_user_id
+            .is_some_and(|id| data.accounts.iter().any(|a| a.user_id == id))
     }
 
     /// `onActiveAccountChanged`: fires on every activation, logout included.
@@ -152,7 +178,9 @@ impl AuthService {
     /// `getStoredAccountFlags(userId).userAbove13 === true`.
     pub fn is_user_above13(&self, user_id: u64) -> bool {
         let data = self.data.read();
-        data.accounts.iter().any(|a| a.user_id == user_id && a.user_above13 == Some(true))
+        data.accounts
+            .iter()
+            .any(|a| a.user_id == user_id && a.user_above13 == Some(true))
     }
 
     /// `updateStoredAccountFlags`: merges age/premium flags, writing and
@@ -166,10 +194,13 @@ impl AuthService {
     ) {
         let changed = {
             let data = self.data.read();
-            let Some(account) = data.accounts.iter().find(|a| a.user_id == user_id) else { return };
+            let Some(account) = data.accounts.iter().find(|a| a.user_id == user_id) else {
+                return;
+            };
             user_above13.or(account.user_above13) != account.user_above13
                 || is_premium.or(account.is_premium) != account.is_premium
-                || has_roblox_subscription.or(account.has_roblox_subscription) != account.has_roblox_subscription
+                || has_roblox_subscription.or(account.has_roblox_subscription)
+                    != account.has_roblox_subscription
         };
         if !changed {
             return;
@@ -178,7 +209,8 @@ impl AuthService {
             if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
                 account.user_above13 = user_above13.or(account.user_above13);
                 account.is_premium = is_premium.or(account.is_premium);
-                account.has_roblox_subscription = has_roblox_subscription.or(account.has_roblox_subscription);
+                account.has_roblox_subscription =
+                    has_roblox_subscription.or(account.has_roblox_subscription);
             }
         });
         match result {
@@ -238,7 +270,9 @@ impl AuthService {
         };
         let result = self.save(|data| {
             if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
-                account.extra.insert(BROWSER_TRACKER_FIELD.to_owned(), Value::String(encrypted));
+                account
+                    .extra
+                    .insert(BROWSER_TRACKER_FIELD.to_owned(), Value::String(encrypted));
             }
         });
         match result {
@@ -280,7 +314,11 @@ impl AuthService {
     fn cookie_for(&self, user_id: u64) -> Option<String> {
         let encrypted = {
             let data = self.data.read();
-            data.accounts.iter().find(|a| a.user_id == user_id)?.cookie.clone()
+            data.accounts
+                .iter()
+                .find(|a| a.user_id == user_id)?
+                .cookie
+                .clone()
         };
         self.decrypt(&encrypted)
     }
@@ -291,7 +329,11 @@ impl AuthService {
     }
 
     pub fn has_account(&self, user_id: u64) -> bool {
-        self.data.read().accounts.iter().any(|a| a.user_id == user_id)
+        self.data
+            .read()
+            .accounts
+            .iter()
+            .any(|a| a.user_id == user_id)
     }
 
     /// `persistCookieForUser`: stores a rotated `.ROBLOSECURITY`.
@@ -299,7 +341,9 @@ impl AuthService {
         if self.cookie_for(user_id).as_deref() == Some(cookie) {
             return;
         }
-        let Ok(encrypted) = self.crypto.encrypt_base64(cookie) else { return };
+        let Ok(encrypted) = self.crypto.encrypt_base64(cookie) else {
+            return;
+        };
         let result = self.save(|data| {
             if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
                 account.cookie = encrypted;
@@ -315,11 +359,16 @@ impl AuthService {
     fn invalidate_with_notification(&self, user_id: u64) {
         let (display_name, was_active) = {
             let data = self.data.read();
-            let Some(account) = data.accounts.iter().find(|a| a.user_id == user_id) else { return };
+            let Some(account) = data.accounts.iter().find(|a| a.user_id == user_id) else {
+                return;
+            };
             if account.session_invalid == Some(true) {
                 return;
             }
-            (account.display_name.clone(), data.active_user_id == Some(user_id))
+            (
+                account.display_name.clone(),
+                data.active_user_id == Some(user_id),
+            )
         };
         if was_active {
             self.roblox.set_cookie(None);
@@ -334,7 +383,10 @@ impl AuthService {
             tracing::warn!(%error, "Auth: failed to mark session invalid");
             return;
         }
-        self.events.emit_main("auth:invalidated", json!({ "userId": user_id, "displayName": display_name }));
+        self.events.emit_main(
+            "auth:invalidated",
+            json!({ "userId": user_id, "displayName": display_name }),
+        );
         if was_active {
             self.notify_active_account_changed(None);
         }
@@ -344,7 +396,9 @@ impl AuthService {
     pub async fn get_auth_ticket(&self, user_id: Option<u64>) -> AppResult<String> {
         let target = user_id.or_else(|| self.current_user_id());
         let cookie = match user_id {
-            Some(id) => self.cookie_for(id).ok_or_else(|| AppError::msg(format!("Pinned account {id} was not found")))?,
+            Some(id) => self
+                .cookie_for(id)
+                .ok_or_else(|| AppError::msg(format!("Pinned account {id} was not found")))?,
             None => self
                 .stored_cookie(None)
                 .ok_or_else(|| AppError::msg("Not authenticated - cannot generate auth ticket"))?,
@@ -356,7 +410,13 @@ impl AuthService {
             .get_all(reqwest::header::SET_COOKIE)
             .iter()
             .filter_map(|v| v.to_str().ok())
-            .find_map(|v| v.split(';').next()?.trim().strip_prefix(".ROBLOSECURITY=").map(str::to_owned))
+            .find_map(|v| {
+                v.split(';')
+                    .next()?
+                    .trim()
+                    .strip_prefix(".ROBLOSECURITY=")
+                    .map(str::to_owned)
+            })
             .filter(|c| !c.is_empty() && *c != cookie);
         if let (Some(target), Some(rotated)) = (target, rotated) {
             if self.has_account(target) {
@@ -376,7 +436,9 @@ impl AuthService {
                 }
                 return Err(AppError::msg("Authentication expired - please login again"));
             }
-            return Err(AppError::msg(format!("Failed to generate auth ticket: {status}")));
+            return Err(AppError::msg(format!(
+                "Failed to generate auth ticket: {status}"
+            )));
         }
         let ticket = response
             .headers()
@@ -406,7 +468,8 @@ impl AuthService {
 
     fn notify_active_account_changed(&self, user_id: Option<u64>) {
         self.favorites.lock().clear();
-        self.events.emit(ACTIVE_ACCOUNT_CHANGED, json!({ "userId": user_id }));
+        self.events
+            .emit(ACTIVE_ACCOUNT_CHANGED, json!({ "userId": user_id }));
         self.account_tx.send_replace(user_id);
     }
 
@@ -432,8 +495,12 @@ impl AuthService {
 
     /// `getAuthenticatedUser`.
     pub async fn authenticated_user(&self) -> AppResult<Option<Value>> {
-        let Some(user_id) = self.current_user_id() else { return Ok(None) };
-        let Some(cookie) = self.cookie_for(user_id) else { return Ok(None) };
+        let Some(user_id) = self.current_user_id() else {
+            return Ok(None);
+        };
+        let Some(cookie) = self.cookie_for(user_id) else {
+            return Ok(None);
+        };
         match self.validate_cookie(&cookie).await {
             Ok(Some(validated)) => {
                 self.roblox.set_cookie(Some(&cookie));
@@ -508,7 +575,9 @@ impl AuthService {
     }
 
     async fn switch_account(&self, user_id: u64) -> AppResult<()> {
-        let cookie = self.cookie_for(user_id).ok_or_else(|| AppError::msg("Account not found"))?;
+        let cookie = self
+            .cookie_for(user_id)
+            .ok_or_else(|| AppError::msg("Account not found"))?;
         let validated = self.validate_cookie(&cookie).await.map_err(|_| {
             AppError::msg("Could not reach Roblox to validate this account. Check your connection and try again.")
         })?;
@@ -533,7 +602,11 @@ impl AuthService {
     async fn remove_account(&self, user_id: u64) -> AppResult<()> {
         let (was_active, next) = {
             let data = self.data.read();
-            let next = data.accounts.iter().find(|a| a.user_id != user_id).map(|a| a.user_id);
+            let next = data
+                .accounts
+                .iter()
+                .find(|a| a.user_id != user_id)
+                .map(|a| a.user_id);
             (data.active_user_id == Some(user_id), next)
         };
         self.save(|data| data.accounts.retain(|a| a.user_id != user_id))?;
@@ -556,7 +629,9 @@ impl AuthService {
                     active = Some(next_id);
                 }
                 Ok(None) => self.save(|data| mark_invalid(data, next_id, true))?,
-                Err(error) => tracing::warn!(%error, "Auth: transient validation failure after removal"),
+                Err(error) => {
+                    tracing::warn!(%error, "Auth: transient validation failure after removal")
+                }
             }
         }
         if active.is_none() {
@@ -571,7 +646,10 @@ impl AuthService {
 
     /// `getUserMembership` + `resolveMembership`; both lookups run concurrently.
     async fn membership(&self, user_id: u64, cookie: Option<&str>) -> Map<String, Value> {
-        let member_url = format!("{}/users/{user_id}/validate-membership", endpoints::PREMIUM_FEATURES_V1);
+        let member_url = format!(
+            "{}/users/{user_id}/validate-membership",
+            endpoints::PREMIUM_FEATURES_V1
+        );
         let header_url = format!("{}/profiles/get", endpoints::PROFILE_PLATFORM_API);
         let header_body = json!({
             "profileId": user_id.to_string(),
@@ -583,7 +661,9 @@ impl AuthService {
                 match cookie {
                     Some(c) => {
                         let response = self.roblox.get_as(&member_url, c).await.ok()?;
-                        RobloxClient::decode::<bool>(&member_url, response).await.ok()
+                        RobloxClient::decode::<bool>(&member_url, response)
+                            .await
+                            .ok()
                     }
                     None => self.roblox.get::<bool>(&member_url).await.ok(),
                 }
@@ -591,7 +671,11 @@ impl AuthService {
             async {
                 let profile: Value = match cookie {
                     Some(c) => {
-                        let response = self.roblox.post_as(&header_url, &header_body, c).await.ok()?;
+                        let response = self
+                            .roblox
+                            .post_as(&header_url, &header_body, c)
+                            .await
+                            .ok()?;
                         RobloxClient::decode(&header_url, response).await.ok()?
                     }
                     None => self.roblox.post(&header_url, &header_body).await.ok()?,
@@ -605,15 +689,20 @@ impl AuthService {
 
     pub async fn user_details(&self, user_id: u64) -> AppResult<Value> {
         let url = format!("{}/users/{user_id}", endpoints::USERS_V1);
-        let (user, membership) =
-            futures::future::join(self.roblox.get::<Map<String, Value>>(&url), self.membership(user_id, None)).await;
+        let (user, membership) = futures::future::join(
+            self.roblox.get::<Map<String, Value>>(&url),
+            self.membership(user_id, None),
+        )
+        .await;
         let mut user = user?;
         user.extend(membership);
         Ok(Value::Object(user))
     }
 
     async fn robux_balance(&self) -> u64 {
-        let Some(user_id) = self.current_user_id() else { return 0 };
+        let Some(user_id) = self.current_user_id() else {
+            return 0;
+        };
         let url = format!("{}/users/{user_id}/currency", endpoints::ECONOMY_V1);
         match self.roblox.get::<Value>(&url).await {
             Ok(body) => body.get("robux").and_then(Value::as_u64).unwrap_or(0),
@@ -639,10 +728,12 @@ impl AuthService {
         .await?;
         Ok(pages
             .into_iter()
-            .flat_map(|mut page| match page.get_mut("userPresences").map(Value::take) {
-                Some(Value::Array(list)) => list,
-                _ => Vec::new(),
-            })
+            .flat_map(
+                |mut page| match page.get_mut("userPresences").map(Value::take) {
+                    Some(Value::Array(list)) => list,
+                    _ => Vec::new(),
+                },
+            )
             .collect())
     }
 
@@ -653,7 +744,12 @@ impl AuthService {
         size: &str,
         include_profile_frame: bool,
     ) -> AppResult<std::collections::BTreeMap<String, String>> {
-        let query = IdQuery { kind: "AvatarHeadShot", size, format: "Png", include_profile_frame: Some(include_profile_frame) };
+        let query = IdQuery {
+            kind: "AvatarHeadShot",
+            size,
+            format: "Png",
+            include_profile_frame: Some(include_profile_frame),
+        };
         thumbnails
             .batch_by_id(user_ids, &query, |missing| async move {
                 let pages = futures::future::try_join_all(missing.chunks(HEADSHOT_BATCH).map(|chunk| {
@@ -680,7 +776,10 @@ impl AuthService {
         if let Some(games) = cached {
             return Ok(games);
         }
-        let url = format!("{}/users/{user_id}/favorite/games?sortOrder=Desc&limit=50", endpoints::GAMES_V2);
+        let url = format!(
+            "{}/users/{user_id}/favorite/games?sortOrder=Desc&limit=50",
+            endpoints::GAMES_V2
+        );
         let page: Value = self.roblox.get(&url).await?;
         let games: Arc<[FavoriteGame]> = page
             .get("data")
@@ -688,25 +787,40 @@ impl AuthService {
             .map(|list| {
                 list.iter()
                     .map(|g| {
-                        let root = g.pointer("/rootPlace/id").and_then(Value::as_u64).unwrap_or(0);
+                        let root = g
+                            .pointer("/rootPlace/id")
+                            .and_then(Value::as_u64)
+                            .unwrap_or(0);
                         FavoriteGame {
                             id: g.get("id").and_then(Value::as_u64).unwrap_or(0),
-                            name: g.get("name").and_then(Value::as_str).unwrap_or_default().to_owned(),
+                            name: g
+                                .get("name")
+                                .and_then(Value::as_str)
+                                .unwrap_or_default()
+                                .to_owned(),
                             place_id: root,
                             root_place_id: root,
-                            description: g.get("description").and_then(Value::as_str).unwrap_or_default().to_owned(),
+                            description: g
+                                .get("description")
+                                .and_then(Value::as_str)
+                                .unwrap_or_default()
+                                .to_owned(),
                         }
                     })
                     .collect()
             })
             .unwrap_or_default();
-        self.favorites.lock().insert(user_id, (Instant::now(), Arc::clone(&games)));
+        self.favorites
+            .lock()
+            .insert(user_id, (Instant::now(), Arc::clone(&games)));
         Ok(games)
     }
 
     async fn toggle_favorite_game(&self, universe_id: u64, is_favorite: bool) -> AppResult<bool> {
         let url = format!("{}/games/{universe_id}/favorites", endpoints::GAMES_V1);
-        self.roblox.post::<_, Value>(&url, &json!({ "isFavorited": is_favorite })).await?;
+        self.roblox
+            .post::<_, Value>(&url, &json!({ "isFavorited": is_favorite }))
+            .await?;
         self.favorites.lock().clear();
         Ok(true)
     }
@@ -714,7 +828,11 @@ impl AuthService {
 
 fn mark_invalid(data: &mut AuthFile, user_id: u64, invalid: bool) {
     if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
-        account.session_invalid = if invalid { Some(true) } else { account.session_invalid.map(|_| false) };
+        account.session_invalid = if invalid {
+            Some(true)
+        } else {
+            account.session_invalid.map(|_| false)
+        };
     }
 }
 
@@ -722,7 +840,10 @@ fn mark_invalid(data: &mut AuthFile, user_id: u64, invalid: bool) {
 /// `.ROBLOSECURITY=...` pair or a full `Set-Cookie` header.
 fn normalize_roblosecurity(input: &str) -> String {
     let mut s = input.trim();
-    if let Some(rest) = s.strip_prefix("Set-Cookie:").or_else(|| s.strip_prefix("set-cookie:")) {
+    if let Some(rest) = s
+        .strip_prefix("Set-Cookie:")
+        .or_else(|| s.strip_prefix("set-cookie:"))
+    {
         s = rest.trim();
     }
     if let Some(pos) = s.find(".ROBLOSECURITY=") {
@@ -734,8 +855,13 @@ fn normalize_roblosecurity(input: &str) -> String {
 
 /// Exact port of `resolveMembership` from the Electron build.
 fn resolve_membership(header: Option<&Value>, is_member: Option<bool>) -> Map<String, Value> {
-    let is_premium = header.and_then(|h| h.get("isPremium")).and_then(Value::as_bool) == Some(true);
-    let header_plus = header.and_then(|h| h.get("isRobloxPlus")).and_then(Value::as_bool);
+    let is_premium = header
+        .and_then(|h| h.get("isPremium"))
+        .and_then(Value::as_bool)
+        == Some(true);
+    let header_plus = header
+        .and_then(|h| h.get("isRobloxPlus"))
+        .and_then(Value::as_bool);
 
     let has_premium = match (is_member, is_premium, header_plus) {
         (Some(member), _, _) => Some(member),
@@ -762,10 +888,18 @@ fn resolve_membership(header: Option<&Value>, is_member: Option<bool>) -> Map<St
 
 pub fn register(router: &mut Router) {
     router
-        .handle("auth:isAuthenticated", |ctx, _| async move { Ok(ctx.state.auth.is_authenticated()) })
-        .handle("auth:getUser", |ctx, _| async move { ctx.state.auth.authenticated_user().await })
-        .handle("auth:getAccounts", |ctx, _| async move { ctx.state.auth.accounts_json() })
-        .handle("auth:getRobuxBalance", |ctx, _| async move { Ok(ctx.state.auth.robux_balance().await) })
+        .handle("auth:isAuthenticated", |ctx, _| async move {
+            Ok(ctx.state.auth.is_authenticated())
+        })
+        .handle("auth:getUser", |ctx, _| async move {
+            ctx.state.auth.authenticated_user().await
+        })
+        .handle("auth:getAccounts", |ctx, _| async move {
+            ctx.state.auth.accounts_json()
+        })
+        .handle("auth:getRobuxBalance", |ctx, _| async move {
+            Ok(ctx.state.auth.robux_balance().await)
+        })
         .handle("auth:getUserDetails", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;
             ctx.state.auth.user_details(user_id).await
@@ -776,9 +910,14 @@ pub fn register(router: &mut Router) {
         })
         .handle("auth:getAvatarHeadshots", |ctx, args| async move {
             let ids: Vec<u64> = args.get(0)?;
-            let size = args.opt::<String>(1)?.unwrap_or_else(|| "150x150".to_owned());
+            let size = args
+                .opt::<String>(1)?
+                .unwrap_or_else(|| "150x150".to_owned());
             let frame = args.opt::<bool>(2)?.unwrap_or(true);
-            ctx.state.auth.headshots(&ctx.state.thumbnails, &ids, &size, frame).await
+            ctx.state
+                .auth
+                .headshots(&ctx.state.thumbnails, &ids, &size, frame)
+                .await
         })
         .handle("auth:getFavoriteGames", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;
@@ -787,7 +926,10 @@ pub fn register(router: &mut Router) {
         .handle("auth:toggleFavoriteGame", |ctx, args| async move {
             let universe_id: u64 = args.get(0)?;
             let is_favorite: bool = args.get(1)?;
-            ctx.state.auth.toggle_favorite_game(universe_id, is_favorite).await
+            ctx.state
+                .auth
+                .toggle_favorite_game(universe_id, is_favorite)
+                .await
         })
         .handle("auth:setCookie", |ctx, args| async move {
             let cookie: String = args.get(0)?;
@@ -826,6 +968,9 @@ mod tests {
     fn cookie_normalization() {
         assert_eq!(normalize_roblosecurity("  abc  "), "abc");
         assert_eq!(normalize_roblosecurity(".ROBLOSECURITY=abc; path=/"), "abc");
-        assert_eq!(normalize_roblosecurity("Set-Cookie: .ROBLOSECURITY=\"abc\"; domain=.roblox.com"), "abc");
+        assert_eq!(
+            normalize_roblosecurity("Set-Cookie: .ROBLOSECURITY=\"abc\"; domain=.roblox.com"),
+            "abc"
+        );
     }
 }

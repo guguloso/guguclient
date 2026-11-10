@@ -48,7 +48,13 @@ mod tests {
     #[test]
     fn iso_dates() {
         assert_eq!(super::iso8601_from_unix(0), "1970-01-01T00:00:00.000Z");
-        assert_eq!(super::iso8601_from_unix(1_700_000_000), "2023-11-14T22:13:20.000Z");
-        assert_eq!(super::iso8601_from_millis(1_700_000_000_042), "2023-11-14T22:13:20.042Z");
+        assert_eq!(
+            super::iso8601_from_unix(1_700_000_000),
+            "2023-11-14T22:13:20.000Z"
+        );
+        assert_eq!(
+            super::iso8601_from_millis(1_700_000_000_042),
+            "2023-11-14T22:13:20.042Z"
+        );
     }
 }

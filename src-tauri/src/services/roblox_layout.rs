@@ -35,7 +35,10 @@ const PLAYER_PACKAGES: &[(&str, &str)] = &[
     ("content-textures3.zip", "PlatformContent/pc/textures"),
     ("content-terrain.zip", "PlatformContent/pc/terrain"),
     ("content-platform-fonts.zip", "PlatformContent/pc/fonts"),
-    ("content-platform-dictionaries.zip", "PlatformContent/pc/shared_compression_dictionaries"),
+    (
+        "content-platform-dictionaries.zip",
+        "PlatformContent/pc/shared_compression_dictionaries",
+    ),
     ("extracontent-luapackages.zip", "ExtraContent/LuaPackages"),
     ("extracontent-translations.zip", "ExtraContent/translations"),
     ("extracontent-models.zip", "ExtraContent/models"),
@@ -65,10 +68,16 @@ const STUDIO_PACKAGES: &[(&str, &str)] = &[
     ("ssl.zip", "ssl"),
     ("content-textures2.zip", "content/textures"),
     ("content-textures3.zip", "PlatformContent/pc/textures"),
-    ("content-studio_svg_textures.zip", "content/studio_svg_textures"),
+    (
+        "content-studio_svg_textures.zip",
+        "content/studio_svg_textures",
+    ),
     ("content-terrain.zip", "PlatformContent/pc/terrain"),
     ("content-platform-fonts.zip", "PlatformContent/pc/fonts"),
-    ("content-platform-dictionaries.zip", "PlatformContent/pc/shared_compression_dictionaries"),
+    (
+        "content-platform-dictionaries.zip",
+        "PlatformContent/pc/shared_compression_dictionaries",
+    ),
     ("content-api-docs.zip", "content/api-docs"),
     ("extracontent-scripts.zip", "ExtraContent/scripts"),
     ("extracontent-luapackages.zip", "ExtraContent/LuaPackages"),
@@ -112,7 +121,11 @@ pub struct ProductPaths {
 }
 
 pub fn product_paths(base: &Path, product: &str) -> ProductPaths {
-    let root = if product == "studio" { base.join("studio") } else { base.to_path_buf() };
+    let root = if product == "studio" {
+        base.join("studio")
+    } else {
+        base.to_path_buf()
+    };
     ProductPaths {
         versions_dir: root.join("versions"),
         installed_versions_file: root.join("installed-versions.json"),
@@ -128,14 +141,19 @@ pub fn is_valid_version_hash(hash: &str) -> bool {
     !bytes.is_empty()
         && bytes.len() <= 128
         && bytes[0].is_ascii_alphanumeric()
-        && bytes.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'_' || *b == b'-')
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'_' || *b == b'-')
 }
 
 /// `UUID_REGEX` (case-insensitive, hyphenated 8-4-4-4-12).
 pub fn is_valid_instance_id(id: &str) -> bool {
     let parts: Vec<&str> = id.split('-').collect();
     parts.len() == 5
-        && parts.iter().zip([8, 4, 4, 4, 12]).all(|(p, n)| p.len() == n && p.bytes().all(|b| b.is_ascii_hexdigit()))
+        && parts
+            .iter()
+            .zip([8, 4, 4, 4, 12])
+            .all(|(p, n)| p.len() == n && p.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
 pub fn version_install_dir(base: &Path, hash: &str, product: &str) -> AppResult<PathBuf> {
@@ -206,7 +224,11 @@ pub fn ensure_instance_data_dir(base: &Path, id: &str, product: &str) -> AppResu
 
 /// `%LOCALAPPDATA%\Roblox\LocalStorage\appStorage.json`.
 pub fn system_app_storage() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|d| d.join("Roblox").join("LocalStorage").join("appStorage.json"))
+    dirs::data_local_dir().map(|d| {
+        d.join("Roblox")
+            .join("LocalStorage")
+            .join("appStorage.json")
+    })
 }
 
 /// Writes JSON like `FileStore.writeJson` (2-space indent, atomic).
@@ -244,7 +266,8 @@ pub struct ProcessEntry {
 pub fn process_list() -> Vec<ProcessEntry> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
     };
     let mut out = Vec::new();
     // SAFETY: plain Win32 snapshot iteration; the handle is closed below and
@@ -258,8 +281,15 @@ pub fn process_list() -> Vec<ProcessEntry> {
         entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
         let mut ok = Process32FirstW(snapshot, &mut entry);
         while ok != 0 {
-            let len = entry.szExeFile.iter().position(|c| *c == 0).unwrap_or(entry.szExeFile.len());
-            out.push(ProcessEntry { pid: entry.th32ProcessID, name: String::from_utf16_lossy(&entry.szExeFile[..len]) });
+            let len = entry
+                .szExeFile
+                .iter()
+                .position(|c| *c == 0)
+                .unwrap_or(entry.szExeFile.len());
+            out.push(ProcessEntry {
+                pid: entry.th32ProcessID,
+                name: String::from_utf16_lossy(&entry.szExeFile[..len]),
+            });
             ok = Process32NextW(snapshot, &mut entry);
         }
         CloseHandle(snapshot);
@@ -274,7 +304,10 @@ pub fn process_list() -> Vec<ProcessEntry> {
 
 /// `matchesProcessName`: case-insensitive, `.exe` optional.
 pub fn matches_process_name(name: &str, process: &str) -> bool {
-    let trimmed = name.strip_suffix(".exe").or_else(|| name.strip_suffix(".EXE")).unwrap_or(name);
+    let trimmed = name
+        .strip_suffix(".exe")
+        .or_else(|| name.strip_suffix(".EXE"))
+        .unwrap_or(name);
     trimmed.eq_ignore_ascii_case(process)
 }
 
@@ -287,7 +320,9 @@ pub fn kill_pid(pid: u32) -> std::io::Result<bool> {
     #[cfg(windows)]
     {
         use windows_sys::Win32::Foundation::CloseHandle;
-        use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, TerminateProcess, PROCESS_TERMINATE,
+        };
         // SAFETY: handle is checked and closed; TerminateProcess on our own request.
         unsafe {
             let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
@@ -329,18 +364,25 @@ impl SingletonMutex {
         if slot.is_some() {
             return true;
         }
-        let name: Vec<u16> = ROBLOX_SINGLETON_MUTEX.encode_utf16().chain(Some(0)).collect();
+        let name: Vec<u16> = ROBLOX_SINGLETON_MUTEX
+            .encode_utf16()
+            .chain(Some(0))
+            .collect();
         // SAFETY: null attributes, owned initial state, NUL-terminated name.
         unsafe {
             let handle = CreateMutexW(std::ptr::null(), 1, name.as_ptr());
             let last_error = GetLastError();
             if handle.is_null() {
-                tracing::warn!("Failed to create {ROBLOX_SINGLETON_MUTEX} (GetLastError={last_error})");
+                tracing::warn!(
+                    "Failed to create {ROBLOX_SINGLETON_MUTEX} (GetLastError={last_error})"
+                );
                 return false;
             }
             if last_error == ERROR_ALREADY_EXISTS {
                 CloseHandle(handle);
-                tracing::warn!("{ROBLOX_SINGLETON_MUTEX} already exists (GetLastError={last_error})");
+                tracing::warn!(
+                    "{ROBLOX_SINGLETON_MUTEX} already exists (GetLastError={last_error})"
+                );
                 return false;
             }
             *slot = Some(handle as usize);
@@ -355,7 +397,9 @@ impl SingletonMutex {
     }
 
     pub fn release(&self) {
-        let Some(handle) = self.handle.lock().take() else { return };
+        let Some(handle) = self.handle.lock().take() else {
+            return;
+        };
         #[cfg(windows)]
         // SAFETY: the handle came from CreateMutexW above and is released once.
         unsafe {
@@ -382,6 +426,9 @@ mod tests {
         assert!(!is_valid_version_hash("-abc"));
         assert!(is_valid_instance_id("6de99854-ec51-4ee4-969a-05b20b7eae12"));
         assert!(!is_valid_instance_id("6de99854-ec51-4ee4-969a-05b20b7eae1"));
-        assert!(matches_process_name("RobloxPlayerBeta.exe", "robloxplayerbeta"));
+        assert!(matches_process_name(
+            "RobloxPlayerBeta.exe",
+            "robloxplayerbeta"
+        ));
     }
 }

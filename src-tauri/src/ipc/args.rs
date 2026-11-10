@@ -28,13 +28,18 @@ impl Args {
     pub fn opt<T: DeserializeOwned>(&self, index: usize) -> AppResult<Option<T>> {
         match self.values.get(index) {
             None | Some(Value::Null) => Ok(None),
-            Some(value) => Option::<T>::deserialize(value).map_err(|error| self.invalid(index, error)),
+            Some(value) => {
+                Option::<T>::deserialize(value).map_err(|error| self.invalid(index, error))
+            }
         }
     }
 
     /// Moves an argument out (for pass-through payloads such as patches).
     pub fn take(&mut self, index: usize) -> Value {
-        self.values.get_mut(index).map(std::mem::take).unwrap_or(Value::Null)
+        self.values
+            .get_mut(index)
+            .map(std::mem::take)
+            .unwrap_or(Value::Null)
     }
 
     fn invalid(&self, index: usize, error: serde_json::Error) -> AppError {

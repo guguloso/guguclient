@@ -89,11 +89,19 @@ pub struct GameListsState {
 }
 
 fn session_id(ctx: &Ctx) -> String {
-    ctx.state.game_lists.session_id.lock().get_or_insert_with(|| uuid::Uuid::new_v4().to_string()).clone()
+    ctx.state
+        .game_lists
+        .session_id
+        .lock()
+        .get_or_insert_with(|| uuid::Uuid::new_v4().to_string())
+        .clone()
 }
 
 fn fresh<T: Clone>(slot: &Cached<T>, ttl: Duration) -> Option<T> {
-    slot.lock().as_ref().filter(|(at, _)| at.elapsed() < ttl).map(|(_, v)| v.clone())
+    slot.lock()
+        .as_ref()
+        .filter(|(at, _)| at.elapsed() < ttl)
+        .map(|(_, v)| v.clone())
 }
 
 fn query_string(pairs: &[(&str, String)]) -> String {
@@ -118,10 +126,16 @@ async fn explore_sorts(ctx: &Ctx) -> AppResult<Vec<ExploreSort>> {
         if let Some(token) = &token {
             params.push(("sortsPageToken", token.clone()));
         }
-        let url = format!("{}/get-sorts?{}", endpoints::EXPLORE_API, query_string(&params));
+        let url = format!(
+            "{}/get-sorts?{}",
+            endpoints::EXPLORE_API,
+            query_string(&params)
+        );
         let page: SortsPage = ctx.state.roblox.get(&url).await?;
         for raw in page.sorts {
-            let Ok(sort) = serde_json::from_value::<ExploreSort>(raw) else { continue };
+            let Ok(sort) = serde_json::from_value::<ExploreSort>(raw) else {
+                continue;
+            };
             if sort.sort_id == "filters" || !seen.insert(sort.sort_id.clone()) {
                 continue;
             }
@@ -136,7 +150,11 @@ async fn explore_sorts(ctx: &Ctx) -> AppResult<Vec<ExploreSort>> {
     Ok(collected)
 }
 
-async fn sort_content(ctx: &Ctx, sort_id: &str, sort: Option<&ExploreSort>) -> Option<Vec<ExploreGame>> {
+async fn sort_content(
+    ctx: &Ctx,
+    sort_id: &str,
+    sort: Option<&ExploreSort>,
+) -> Option<Vec<ExploreGame>> {
     let session = session_id(ctx);
     let mut params = vec![
         ("sessionId", session.clone()),
@@ -154,8 +172,16 @@ async fn sort_content(ctx: &Ctx, sort_id: &str, sort: Option<&ExploreSort>) -> O
             params.push(("treatmentType", t.clone()));
         }
     }
-    params.extend(SORT_CONTENT_CONTEXT.iter().map(|(k, v)| (*k, (*v).to_owned())));
-    let url = format!("{}/get-sort-content?{}", endpoints::EXPLORE_API, query_string(&params));
+    params.extend(
+        SORT_CONTENT_CONTEXT
+            .iter()
+            .map(|(k, v)| (*k, (*v).to_owned())),
+    );
+    let url = format!(
+        "{}/get-sort-content?{}",
+        endpoints::EXPLORE_API,
+        query_string(&params)
+    );
     match ctx.state.roblox.get::<ExploreSort>(&url).await {
         Ok(sort) => Some(sort.games),
         Err(error) => {
@@ -189,7 +215,12 @@ fn to_list_item(game: &ExploreGame) -> Value {
         ("nativeAdData", game.native_ad_data.clone().map(Value::from)),
         ("isShowSponsoredLabel", game.is_sponsored.map(Value::from)),
         ("minimumAge", game.minimum_age.map(Value::from)),
-        ("ageRecommendationDisplayName", game.age_recommendation_display_name.clone().map(Value::from)),
+        (
+            "ageRecommendationDisplayName",
+            game.age_recommendation_display_name
+                .clone()
+                .map(Value::from),
+        ),
     ];
     for (key, value) in fields {
         if let Some(value) = value {
@@ -209,11 +240,18 @@ async fn games_by_sort(ctx: &Ctx, sort_id: String, limit: usize) -> AppResult<Va
     let sorts = explore_sorts(ctx).await?;
     let sort = sorts.iter().find(|s| s.sort_id == sort_id);
     let full = sort_content(ctx, &sort_id, sort).await;
-    let source = full.as_deref().or(sort.map(|s| s.games.as_slice())).unwrap_or_default();
+    let source = full
+        .as_deref()
+        .or(sort.map(|s| s.games.as_slice()))
+        .unwrap_or_default();
     let games: Vec<Value> = source.iter().take(limit).map(to_list_item).collect();
     let games = Value::Array(games);
     if games.as_array().is_some_and(|g| !g.is_empty()) {
-        ctx.state.game_lists.sort_content.lock().insert(key, (Instant::now(), games.clone()));
+        ctx.state
+            .game_lists
+            .sort_content
+            .lock()
+            .insert(key, (Instant::now(), games.clone()));
     }
     Ok(games)
 }
@@ -228,9 +266,20 @@ async fn promoted_games(ctx: &Ctx, force_refresh: bool) -> AppResult<Value> {
         }
     }
     let installation_id = gated_installation_id(&ctx.state);
-    let query = [("installation_id", installation_id.as_str()), ("version", env!("CARGO_PKG_VERSION"))];
-    let mut response: Value = ctx.state.metadata.api().get("/v1/games/promoted", &query).await?;
-    let games = response.get_mut("games").map(Value::take).unwrap_or(Value::Null);
+    let query = [
+        ("installation_id", installation_id.as_str()),
+        ("version", env!("CARGO_PKG_VERSION")),
+    ];
+    let mut response: Value = ctx
+        .state
+        .metadata
+        .api()
+        .get("/v1/games/promoted", &query)
+        .await?;
+    let games = response
+        .get_mut("games")
+        .map(Value::take)
+        .unwrap_or(Value::Null);
     *slot = Some((Instant::now(), games.clone()));
     Ok(games)
 }
@@ -248,7 +297,9 @@ async fn playability(ctx: &Ctx, universe_ids: Vec<u64>) -> AppResult<Value> {
     .await?;
     let mut out = serde_json::Map::new();
     for entry in pages.into_iter().flatten() {
-        let Some(id) = entry.get("universeId").and_then(Value::as_u64) else { continue };
+        let Some(id) = entry.get("universeId").and_then(Value::as_u64) else {
+            continue;
+        };
         out.insert(
             id.to_string(),
             json!({
@@ -300,14 +351,18 @@ async fn set_vote(ctx: &Ctx, place_id: u64, vote: Option<bool>) -> AppResult<Opt
         Some(false) => "false",
         None => "null",
     };
-    let url = format!("{}/vote/asset/{place_id}?vote={param}", endpoints::VOTING_API);
+    let url = format!(
+        "{}/vote/asset/{place_id}?vote={param}",
+        endpoints::VOTING_API
+    );
     let raw: Value = ctx.state.roblox.post(&url, &json!({})).await?;
     let action = match vote {
         Some(true) => "like",
         Some(false) => "dislike",
         None => "none",
     };
-    ctx.state.track("game.vote", json!({ "place_id": place_id, "vote": action }));
+    ctx.state
+        .track("game.vote", json!({ "place_id": place_id, "vote": action }));
     Ok(Some(normalize_vote(&raw)))
 }
 
@@ -320,7 +375,9 @@ async fn notification_status(ctx: &Ctx, universe_id: u64) -> Option<Value> {
     }
     let url = format!("{FOLLOWINGS_V1}/users/{user_id}/universes/{universe_id}/status");
     match ctx.state.roblox.get::<Value>(&url).await {
-        Ok(raw) => Some(json!({ "canFollow": raw.get("CanFollow"), "isFollowing": raw.get("IsFollowing") })),
+        Ok(raw) => Some(
+            json!({ "canFollow": raw.get("CanFollow"), "isFollowing": raw.get("IsFollowing") }),
+        ),
         Err(error) => {
             tracing::warn!(%error, "Failed to fetch game notification status");
             None
@@ -340,7 +397,10 @@ async fn set_notification(ctx: &Ctx, universe_id: u64, enabled: bool) -> AppResu
     } else {
         ctx.state.roblox.delete::<Value>(&url).await?;
     }
-    ctx.state.track("game.notify", json!({ "universe_id": universe_id, "enabled": enabled }));
+    ctx.state.track(
+        "game.notify",
+        json!({ "universe_id": universe_id, "enabled": enabled }),
+    );
     Ok(true)
 }
 
@@ -358,13 +418,18 @@ async fn friends_playing(ctx: &Ctx, user_id: u64) -> AppResult<Value> {
     };
     let mut entries = Vec::new();
     if !friends.is_empty() {
-        let ids: Vec<u64> = friends.iter().filter_map(|f| f.get("id").and_then(Value::as_u64)).collect();
+        let ids: Vec<u64> = friends
+            .iter()
+            .filter_map(|f| f.get("id").and_then(Value::as_u64))
+            .collect();
         let presences = ctx.state.auth.presence(&ids).await?;
         let in_game: Vec<&Value> = presences
             .iter()
             .filter(|p| {
                 p.get("userPresenceType").and_then(Value::as_u64) == Some(2)
-                    && p.get("universeId").and_then(Value::as_u64).is_some_and(|u| u > 0)
+                    && p.get("universeId")
+                        .and_then(Value::as_u64)
+                        .is_some_and(|u| u > 0)
             })
             .collect();
         if !in_game.is_empty() {
@@ -378,10 +443,14 @@ async fn friends_playing(ctx: &Ctx, user_id: u64) -> AppResult<Value> {
                 }
             }
             let details = games::details(ctx, &universes).await?;
-            let by_id: HashMap<u64, &Value> =
-                details.iter().filter_map(|g| Some((g.get("id")?.as_u64()?, g))).collect();
-            let friends_by_id: HashMap<u64, &Value> =
-                friends.iter().filter_map(|f| Some((f.get("id")?.as_u64()?, f))).collect();
+            let by_id: HashMap<u64, &Value> = details
+                .iter()
+                .filter_map(|g| Some((g.get("id")?.as_u64()?, g)))
+                .collect();
+            let friends_by_id: HashMap<u64, &Value> = friends
+                .iter()
+                .filter_map(|f| Some((f.get("id")?.as_u64()?, f)))
+                .collect();
             for presence in in_game {
                 let (Some(uid), Some(universe)) = (
                     presence.get("userId").and_then(Value::as_u64),
@@ -400,23 +469,39 @@ async fn friends_playing(ctx: &Ctx, user_id: u64) -> AppResult<Value> {
         }
     }
     let entries = Value::Array(entries);
-    ctx.state.game_lists.friends_playing.lock().insert(user_id, (Instant::now(), entries.clone()));
+    ctx.state
+        .game_lists
+        .friends_playing
+        .lock()
+        .insert(user_id, (Instant::now(), entries.clone()));
     Ok(entries)
 }
 
 fn trimmed(v: Option<&Value>) -> Option<String> {
-    v.and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(str::to_owned)
+    v.and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
 }
 
 /// `normalizeServer`.
 fn normalize_server(server: &Value, source: &str, place_id: u64) -> Value {
     let playing = server.get("playing").and_then(Value::as_u64).unwrap_or(0);
-    let max_players = server.get("maxPlayers").and_then(Value::as_u64).unwrap_or(0);
+    let max_players = server
+        .get("maxPlayers")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
     let vip = server.get("vipServerId").filter(|v| !v.is_null());
     let access_code = trimmed(server.get("accessCode"));
     let id = trimmed(server.get("id")).unwrap_or_else(|| match (vip, &access_code) {
         (Some(vip), _) if vip.as_u64() != Some(0) => format!("vip-{vip}"),
-        (_, Some(code)) => format!("code-{}", server.get("accessCode").and_then(Value::as_str).unwrap_or(code)),
+        (_, Some(code)) => format!(
+            "code-{}",
+            server
+                .get("accessCode")
+                .and_then(Value::as_str)
+                .unwrap_or(code)
+        ),
         _ => format!("server-{source}-{place_id}-{}", uuid::Uuid::new_v4()),
     });
     let mut out = json!({
@@ -439,7 +524,12 @@ fn normalize_server(server: &Value, source: &str, place_id: u64) -> Value {
     }
     if let Some(owner) = server.get("owner") {
         let name = trimmed(owner.get("name"));
-        if let (Some(id), Some(name)) = (owner.get("id").filter(|v| v.as_u64().is_some_and(|i| i > 0)), name) {
+        if let (Some(id), Some(name)) = (
+            owner
+                .get("id")
+                .filter(|v| v.as_u64().is_some_and(|i| i > 0)),
+            name,
+        ) {
             out["owner"] = json!({
                 "id": id,
                 "displayName": trimmed(owner.get("displayName")).unwrap_or_else(|| name.clone()),
@@ -460,7 +550,10 @@ fn normalize_server(server: &Value, source: &str, place_id: u64) -> Value {
             players
                 .iter()
                 .enumerate()
-                .filter(|(_, p)| p.get("id").is_some_and(|id| id.as_u64().is_some_and(|i| i > 0)))
+                .filter(|(_, p)| {
+                    p.get("id")
+                        .is_some_and(|id| id.as_u64().is_some_and(|i| i > 0))
+                })
                 .map(|(i, p)| {
                     let name = trimmed(p.get("name")).unwrap_or_default();
                     let display = trimmed(p.get("displayName")).unwrap_or_default();
@@ -469,7 +562,8 @@ fn normalize_server(server: &Value, source: &str, place_id: u64) -> Value {
                         .find(|s| !s.is_empty())
                         .unwrap_or("Player")
                         .to_owned();
-                    let token = trimmed(p.get("playerToken")).or_else(|| tokens.get(i).cloned().flatten());
+                    let token =
+                        trimmed(p.get("playerToken")).or_else(|| tokens.get(i).cloned().flatten());
                     let mut entry = json!({
                         "id": p.get("id"),
                         "name": if name.is_empty() { fallback.clone() } else { name },
@@ -487,7 +581,12 @@ fn normalize_server(server: &Value, source: &str, place_id: u64) -> Value {
         out["previewPlayers"] = Value::Array(players);
     }
     let mut seen = HashSet::new();
-    let unique: Vec<Value> = tokens.into_iter().flatten().filter(|t| seen.insert(t.clone())).map(Value::String).collect();
+    let unique: Vec<Value> = tokens
+        .into_iter()
+        .flatten()
+        .filter(|t| seen.insert(t.clone()))
+        .map(Value::String)
+        .collect();
     if !unique.is_empty() {
         out["previewPlayerTokens"] = Value::Array(unique);
     }
@@ -513,7 +612,11 @@ async fn servers(ctx: &Ctx, place_id: u64, options: ServerOptions) -> AppResult<
         params.push(("limit", limit.to_string()));
     }
     let url = if options.source == "private" {
-        format!("{}/games/{place_id}/private-servers?{}", endpoints::GAMES_V1, query_string(&params))
+        format!(
+            "{}/games/{place_id}/private-servers?{}",
+            endpoints::GAMES_V1,
+            query_string(&params)
+        )
     } else {
         let server_type = if options.source == "public" { 0 } else { 1 };
         if let Some(exclude) = options.exclude_full_games {
@@ -524,13 +627,21 @@ async fn servers(ctx: &Ctx, place_id: u64, options: ServerOptions) -> AppResult<
             Some("desc") => params.push(("sortOrder", "2".into())),
             _ => {}
         }
-        format!("{}/games/{place_id}/servers/{server_type}?{}", endpoints::GAMES_V1, query_string(&params))
+        format!(
+            "{}/games/{place_id}/servers/{server_type}?{}",
+            endpoints::GAMES_V1,
+            query_string(&params)
+        )
     };
     let response: Value = ctx.state.roblox.get(&url).await?;
     let data: Vec<Value> = response
         .get("data")
         .and_then(Value::as_array)
-        .map(|list| list.iter().map(|s| normalize_server(s, &options.source, place_id)).collect())
+        .map(|list| {
+            list.iter()
+                .map(|s| normalize_server(s, &options.source, place_id))
+                .collect()
+        })
         .unwrap_or_default();
     Ok(json!({
         "data": data,
@@ -548,7 +659,10 @@ async fn social_links(ctx: &Ctx, universe_id: u64) -> Value {
             return links.clone();
         }
     }
-    let url = format!("{}/games/{universe_id}/social-links/list", endpoints::GAMES_V1);
+    let url = format!(
+        "{}/games/{universe_id}/social-links/list",
+        endpoints::GAMES_V1
+    );
     match ctx.state.roblox.get::<Value>(&url).await {
         Ok(response) => {
             let links: Vec<Value> = response
@@ -561,6 +675,11 @@ async fn social_links(ctx: &Ctx, universe_id: u64) -> Value {
                 })
                 .unwrap_or_default();
             let links = Value::Array(links);
+            ctx.state.game_communities.record_social_links(
+                &ctx.state,
+                universe_id,
+                links.as_array().map(Vec::as_slice).unwrap_or_default(),
+            );
             let mut cache = ctx.state.game_lists.social_links.lock();
             if cache.len() >= SOCIAL_LINKS_MAX {
                 if let Some(oldest) = cache.iter().min_by_key(|(_, (at, _))| *at).map(|(k, _)| *k) {
@@ -649,8 +768,13 @@ mod tests {
 
     #[test]
     fn vote_and_server_normalization() {
-        let vote = normalize_vote(&json!({ "model": { "canVote": true, "hasVoted": false, "userVote": true } }));
-        assert_eq!(vote, json!({ "canVote": true, "reasonForNotVoteable": "", "userVote": null }));
+        let vote = normalize_vote(
+            &json!({ "model": { "canVote": true, "hasVoted": false, "userVote": true } }),
+        );
+        assert_eq!(
+            vote,
+            json!({ "canVote": true, "reasonForNotVoteable": "", "userVote": null })
+        );
 
         let server = normalize_server(
             &json!({ "id": " abc ", "playing": 10, "maxPlayers": 10, "playerTokens": ["t1", "t1", " "] }),
@@ -661,4 +785,9 @@ mod tests {
         assert_eq!(server["isFull"], true);
         assert_eq!(server["previewPlayerTokens"], json!(["t1"]));
     }
+}
+
+/// `fetchGameSocialLinks` for other services (community lookups).
+pub async fn social_links_for(ctx: &Ctx, universe_id: u64) -> Value {
+    social_links(ctx, universe_id).await
 }

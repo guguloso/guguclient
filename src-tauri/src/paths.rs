@@ -22,8 +22,10 @@ pub struct LauncherPaths {
 
 impl LauncherPaths {
     pub fn resolve() -> AppResult<Self> {
-        let home = dirs::home_dir().ok_or_else(|| AppError::msg("Could not resolve home directory"))?;
-        let roaming = dirs::config_dir().ok_or_else(|| AppError::msg("Could not resolve %APPDATA%"))?;
+        let home =
+            dirs::home_dir().ok_or_else(|| AppError::msg("Could not resolve home directory"))?;
+        let roaming =
+            dirs::config_dir().ok_or_else(|| AppError::msg("Could not resolve %APPDATA%"))?;
         let base = home.join(LAUNCHER_DIRECTORY);
         Ok(Self {
             settings_dir: base.join("settings"),
@@ -36,7 +38,12 @@ impl LauncherPaths {
     }
 
     pub fn ensure_dirs(&self) -> AppResult<()> {
-        for dir in [&self.base, &self.settings_dir, &self.logs_dir, &self.thumbnail_cache_dir] {
+        for dir in [
+            &self.base,
+            &self.settings_dir,
+            &self.logs_dir,
+            &self.thumbnail_cache_dir,
+        ] {
             std::fs::create_dir_all(dir)?;
         }
         Ok(())

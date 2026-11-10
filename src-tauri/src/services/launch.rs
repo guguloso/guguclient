@@ -19,8 +19,8 @@ use crate::error::AppError;
 use crate::ipc::Router;
 use crate::services::instances::{self, product_of, version_hash_of, Instance};
 use crate::services::roblox_layout::{
-    self as layout, ensure_instance_data_dir, is_version_installed, matches_process_name, platform_config,
-    process_list, read_json, version_install_dir, SingletonMutex, PRODUCTS,
+    self as layout, ensure_instance_data_dir, is_version_installed, matches_process_name,
+    platform_config, process_list, read_json, version_install_dir, SingletonMutex, PRODUCTS,
 };
 use crate::services::versions::{self, DOWNLOAD_PROGRESS};
 use crate::state::AppState;
@@ -30,7 +30,8 @@ const PROCESS_EXIT_POLL: Duration = Duration::from_millis(100);
 const MONITOR_INTERVAL: Duration = Duration::from_secs(1);
 const STARTUP_RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 const STARTUP_RUN_VALUE: &str = "RobloxPlayerBeta";
-const DEFAULT_INSTANCE_NAMES: [(&str, &str); 2] = [("player", "My Roblox"), ("studio", "My Studio")];
+const DEFAULT_INSTANCE_NAMES: [(&str, &str); 2] =
+    [("player", "My Roblox"), ("studio", "My Studio")];
 
 /// `LaunchServiceError`: serialized to the renderer as `{ code, details }`.
 #[derive(Debug)]
@@ -41,7 +42,10 @@ pub struct LaunchError {
 
 impl LaunchError {
     fn new(code: &'static str, details: impl Into<String>) -> Self {
-        Self { code, details: details.into() }
+        Self {
+            code,
+            details: details.into(),
+        }
     }
     fn unknown(error: impl std::fmt::Display) -> Self {
         Self::new("UNKNOWN", error.to_string())
@@ -101,7 +105,11 @@ impl LaunchService {
 
     #[allow(dead_code)] // used by captures (activeGame) later
     pub fn instance_id_for_pid(&self, pid: u32) -> Option<String> {
-        self.running.lock().iter().find(|(_, r)| r.pid == Some(pid)).map(|(id, _)| id.clone())
+        self.running
+            .lock()
+            .iter()
+            .find(|(_, r)| r.pid == Some(pid))
+            .map(|(id, _)| id.clone())
     }
 
     /// `runningInstancesService.list()`.
@@ -115,7 +123,8 @@ impl LaunchService {
 }
 
 fn multi_instance_enabled(state: &AppState) -> bool {
-    state.feature_flags.is_enabled("feature-multi-instance") && state.settings.get_bool("enable-multi-instance")
+    state.feature_flags.is_enabled("feature-multi-instance")
+        && state.settings.get_bool("enable-multi-instance")
 }
 
 fn closes_other_players(state: &AppState, product: &str) -> bool {
@@ -123,20 +132,39 @@ fn closes_other_players(state: &AppState, product: &str) -> bool {
 }
 
 fn find_product_pids(products: &[&str]) -> Vec<(u32, &'static str)> {
-    let names: Vec<&'static str> = products.iter().map(|p| platform_config(p).process_name).collect();
+    let names: Vec<&'static str> = products
+        .iter()
+        .map(|p| platform_config(p).process_name)
+        .collect();
     process_list()
         .into_iter()
-        .filter_map(|p| names.iter().find(|n| matches_process_name(&p.name, n)).map(|n| (p.pid, *n)))
+        .filter_map(|p| {
+            names
+                .iter()
+                .find(|n| matches_process_name(&p.name, n))
+                .map(|n| (p.pid, *n))
+        })
         .collect()
 }
 
 fn untracked_player_pids(state: &AppState) -> Vec<u32> {
     let tracked = state.launch.running_pids();
-    find_product_pids(&["player"]).into_iter().map(|(pid, _)| pid).filter(|pid| !tracked.contains(pid)).collect()
+    find_product_pids(&["player"])
+        .into_iter()
+        .map(|(pid, _)| pid)
+        .filter(|pid| !tracked.contains(pid))
+        .collect()
 }
 
 fn other_running_player_ids(state: &AppState, id: &str) -> Vec<String> {
-    state.launch.running.lock().iter().filter(|(k, r)| *k != id && r.product == "player").map(|(k, _)| k.clone()).collect()
+    state
+        .launch
+        .running
+        .lock()
+        .iter()
+        .filter(|(k, r)| *k != id && r.product == "player")
+        .map(|(k, _)| k.clone())
+        .collect()
 }
 
 async fn wait_for_pid_exit(pid: u32) -> bool {
@@ -147,7 +175,10 @@ async fn wait_for_pid_exit(pid: u32) -> bool {
         }
         tokio::time::sleep(PROCESS_EXIT_POLL).await;
     }
-    tracing::warn!("PID {pid} still present after {}ms", PROCESS_EXIT_WAIT.as_millis());
+    tracing::warn!(
+        "PID {pid} still present after {}ms",
+        PROCESS_EXIT_WAIT.as_millis()
+    );
     false
 }
 
@@ -225,7 +256,9 @@ async fn close_other_players(state: &AppState, id: &str) -> LaunchResult<()> {
 fn begin_updating(state: &AppState, product: &str, initiator: Option<&WebviewWindow>) {
     let mut updating = state.launch.updating.lock();
     updating.0 += 1;
-    let label = initiator.map(|w| w.label().to_owned()).unwrap_or_else(|| crate::MAIN_WINDOW.to_owned());
+    let label = initiator
+        .map(|w| w.label().to_owned())
+        .unwrap_or_else(|| crate::MAIN_WINDOW.to_owned());
     if !updating.1.contains(&label) {
         if let Some(window) = state.app.get_webview_window(&label) {
             let _ = tauri::Emitter::emit(
@@ -246,7 +279,11 @@ fn end_updating(state: &AppState) {
     }
     for label in updating.1.drain(..) {
         if let Some(window) = state.app.get_webview_window(&label) {
-            let _ = tauri::Emitter::emit(&window, "gugu:ipc-event", json!({ "channel": "launch:updating", "payload": null }));
+            let _ = tauri::Emitter::emit(
+                &window,
+                "gugu:ipc-event",
+                json!({ "channel": "launch:updating", "payload": null }),
+            );
         }
     }
 }
@@ -258,12 +295,26 @@ fn finish_download_progress(state: &AppState) {
 }
 
 /// `autoUpdateInstance`.
-async fn auto_update(state: &Arc<AppState>, id: &str, instance: Instance, initiator: Option<&WebviewWindow>) -> LaunchResult<Instance> {
-    if !instance.get("autoUpdate").and_then(Value::as_bool).unwrap_or(false) {
+async fn auto_update(
+    state: &Arc<AppState>,
+    id: &str,
+    instance: Instance,
+    initiator: Option<&WebviewWindow>,
+) -> LaunchResult<Instance> {
+    if !instance
+        .get("autoUpdate")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
         return Ok(instance);
     }
     let product = product_of(&instance).to_owned();
-    let channel = instance.get("version").and_then(|v| v.get("channel")).and_then(Value::as_str).unwrap_or("LIVE").to_owned();
+    let channel = instance
+        .get("version")
+        .and_then(|v| v.get("channel"))
+        .and_then(Value::as_str)
+        .unwrap_or("LIVE")
+        .to_owned();
     let latest = versions::latest_version(state, &channel, &product).await?;
     let current = version_hash_of(&instance).to_owned();
     if current == latest.client_version_upload {
@@ -322,14 +373,28 @@ fn describe(auth: &AuthContext) -> String {
     }
 }
 
-async fn resolve_auth(state: &AppState, instance: &Instance, options: Option<&Value>) -> LaunchResult<AuthContext> {
+async fn resolve_auth(
+    state: &AppState,
+    instance: &Instance,
+    options: Option<&Value>,
+) -> LaunchResult<AuthContext> {
     if product_of(instance) != "player" {
-        return Ok(AuthContext { pinned: None, has_cookie: false, precomputed_ticket: None });
+        return Ok(AuthContext {
+            pinned: None,
+            has_cookie: false,
+            precomputed_ticket: None,
+        });
     }
     let pinned = instance.get("accountUserId").and_then(Value::as_u64);
     let has_cookie = state.auth.stored_cookie(pinned).is_some();
-    let mut context = AuthContext { pinned, has_cookie, precomputed_ticket: None };
-    let Some(pinned) = pinned else { return Ok(context) };
+    let mut context = AuthContext {
+        pinned,
+        has_cookie,
+        precomputed_ticket: None,
+    };
+    let Some(pinned) = pinned else {
+        return Ok(context);
+    };
     tracing::info!("Instance is pinned to account {pinned} for launch");
     if !has_cookie {
         return Err(LaunchError::new(
@@ -364,7 +429,11 @@ fn validate_target(state: &AppState, instance: &Instance) -> LaunchResult<Launch
     let hash = version_hash_of(instance).to_owned();
     let product = product_of(instance);
     if !is_version_installed(base, &hash, product) {
-        let display = instance.get("version").and_then(|v| v.get("displayVersion")).and_then(Value::as_str).unwrap_or("");
+        let display = instance
+            .get("version")
+            .and_then(|v| v.get("displayVersion"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
         return Err(LaunchError::new(
             "VERSION_NOT_INSTALLED",
             format!("Version '{display}' ({hash}) is not installed. Please download it first."),
@@ -372,13 +441,21 @@ fn validate_target(state: &AppState, instance: &Instance) -> LaunchResult<Launch
     }
     let install_dir = version_install_dir(base, &hash, product)?;
     if product == "player" {
-        let id = instance.get("id").and_then(Value::as_str).unwrap_or_default();
-        let manifest = layout::instance_config_dir(base, id, product).ok().and_then(|d| read_json(&d.join("mods-manifest.json")));
+        let id = instance
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let manifest = layout::instance_config_dir(base, id, product)
+            .ok()
+            .and_then(|d| read_json(&d.join("mods-manifest.json")));
         let has_mods = manifest
             .as_ref()
             .and_then(|m| m.get("mods"))
             .and_then(Value::as_array)
-            .is_some_and(|mods| mods.iter().any(|m| m.get("enabled").and_then(Value::as_bool).unwrap_or(false)));
+            .is_some_and(|mods| {
+                mods.iter()
+                    .any(|m| m.get("enabled").and_then(Value::as_bool).unwrap_or(false))
+            });
         let has_font = instance.get("customFont").is_some_and(|f| !f.is_null());
         if has_mods || has_font {
             return Err(LaunchError::new(
@@ -389,9 +466,16 @@ fn validate_target(state: &AppState, instance: &Instance) -> LaunchResult<Launch
     }
     let binary_path = layout::binary_path(&install_dir, product);
     if !binary_path.exists() {
-        return Err(LaunchError::new("BINARY_NOT_FOUND", format!("Roblox binary not found at: {}", binary_path.display())));
+        return Err(LaunchError::new(
+            "BINARY_NOT_FOUND",
+            format!("Roblox binary not found at: {}", binary_path.display()),
+        ));
     }
-    Ok(LaunchTarget { version_hash: hash, binary_path, client_settings_dir: install_dir.join("ClientSettings") })
+    Ok(LaunchTarget {
+        version_hash: hash,
+        binary_path,
+        client_settings_dir: install_dir.join("ClientSettings"),
+    })
 }
 
 /// `applyInstanceFastFlags`: `ClientSettings/ClientAppSettings.json`.
@@ -401,12 +485,19 @@ fn apply_fast_flags(instance: &Instance, dir: &std::path::Path) -> std::io::Resu
     }
     std::fs::create_dir_all(dir)?;
     let mut settings = serde_json::Map::new();
-    let fps = instance.get("fpsCap").filter(|v| v.as_f64().is_some_and(|f| f != 0.0)).cloned().unwrap_or(json!(60));
+    let fps = instance
+        .get("fpsCap")
+        .filter(|v| v.as_f64().is_some_and(|f| f != 0.0))
+        .cloned()
+        .unwrap_or(json!(60));
     settings.insert("DFIntTaskSchedulerTargetFps".into(), fps);
     if let Some(flags) = instance.get("fastFlags").and_then(Value::as_object) {
         settings.extend(flags.iter().map(|(k, v)| (k.clone(), v.clone())));
     }
-    std::fs::write(dir.join("ClientAppSettings.json"), serde_json::to_vec_pretty(&Value::Object(settings))?)
+    std::fs::write(
+        dir.join("ClientAppSettings.json"),
+        serde_json::to_vec_pretty(&Value::Object(settings))?,
+    )
 }
 
 fn hidden_command(program: &str) -> std::process::Command {
@@ -421,13 +512,18 @@ fn hidden_command(program: &str) -> std::process::Command {
 
 /// `queryStartupRegistration` via `reg query`: `(command, type)`.
 fn query_startup_registration() -> Option<(String, String)> {
-    let output = hidden_command("reg").args(["query", STARTUP_RUN_KEY, "/v", STARTUP_RUN_VALUE]).output().ok()?;
+    let output = hidden_command("reg")
+        .args(["query", STARTUP_RUN_KEY, "/v", STARTUP_RUN_VALUE])
+        .output()
+        .ok()?;
     if !output.status.success() {
         tracing::debug!("No Roblox startup registration present");
         return None;
     }
     let text = String::from_utf8_lossy(&output.stdout);
-    let line = text.lines().find(|l| l.trim_start().starts_with(STARTUP_RUN_VALUE))?;
+    let line = text
+        .lines()
+        .find(|l| l.trim_start().starts_with(STARTUP_RUN_VALUE))?;
     let rest = line.trim_start()[STARTUP_RUN_VALUE.len()..].trim_start();
     let (kind, data) = rest.split_once(char::is_whitespace)?;
     if !kind.starts_with("REG_") || !kind.ends_with("SZ") {
@@ -438,15 +534,26 @@ fn query_startup_registration() -> Option<(String, String)> {
 
 /// `removeStartupRegistration`: backs the value up, then deletes it.
 fn remove_startup_registration(state: &AppState) {
-    let Some((command, kind)) = query_startup_registration() else { return };
+    let Some((command, kind)) = query_startup_registration() else {
+        return;
+    };
     if !command.is_empty() {
-        let backup = json!({ "command": command, "type": kind, "capturedAt": crate::util::now_iso() });
-        if let Err(error) = layout::write_json(&state.paths.settings_dir.join("roblox-startup-backup.json"), &backup) {
+        let backup =
+            json!({ "command": command, "type": kind, "capturedAt": crate::util::now_iso() });
+        if let Err(error) = layout::write_json(
+            &state.paths.settings_dir.join("roblox-startup-backup.json"),
+            &backup,
+        ) {
             tracing::warn!("Could not back up Roblox startup registration: {error}");
         }
     }
-    match hidden_command("reg").args(["delete", STARTUP_RUN_KEY, "/v", STARTUP_RUN_VALUE, "/f"]).status() {
-        Ok(status) if status.success() => tracing::info!("Removed Roblox launch-at-startup registration"),
+    match hidden_command("reg")
+        .args(["delete", STARTUP_RUN_KEY, "/v", STARTUP_RUN_VALUE, "/f"])
+        .status()
+    {
+        Ok(status) if status.success() => {
+            tracing::info!("Removed Roblox launch-at-startup registration")
+        }
         Ok(status) => tracing::warn!("Failed to remove Roblox startup registration: {status}"),
         Err(error) => tracing::warn!("Failed to remove Roblox startup registration: {error}"),
     }
@@ -461,7 +568,10 @@ fn apply_app_storage_overrides(state: &AppState, instance: &Instance) {
     let disable_startup = state.settings.get_bool("disable-roblox-startup");
     let mut overrides: Vec<(&str, &str)> = Vec::new();
     if disable_tray {
-        overrides.extend([("MinimizeToTray", "false"), ("SystemTrayModalShown", "true")]);
+        overrides.extend([
+            ("MinimizeToTray", "false"),
+            ("SystemTrayModalShown", "true"),
+        ]);
     }
     if disable_startup {
         overrides.push(("LaunchAtStartup", "false"));
@@ -470,7 +580,10 @@ fn apply_app_storage_overrides(state: &AppState, instance: &Instance) {
         let mut storage = match read_json(&path) {
             Some(Value::Object(map)) => map,
             Some(_) => {
-                tracing::warn!("Non-object appStorage.json at {}; resetting", path.display());
+                tracing::warn!(
+                    "Non-object appStorage.json at {}; resetting",
+                    path.display()
+                );
                 serde_json::Map::new()
             }
             None => serde_json::Map::new(),
@@ -489,8 +602,13 @@ fn apply_app_storage_overrides(state: &AppState, instance: &Instance) {
                 .and_then(|()| std::fs::write(&tmp, bytes))
                 .and_then(|()| std::fs::rename(&tmp, &path));
             match result {
-                Ok(()) => tracing::debug!("Patched Roblox appStorage overrides at {}", path.display()),
-                Err(error) => tracing::warn!("Failed to apply appStorage overrides at {}: {error}", path.display()),
+                Ok(()) => {
+                    tracing::debug!("Patched Roblox appStorage overrides at {}", path.display())
+                }
+                Err(error) => tracing::warn!(
+                    "Failed to apply appStorage overrides at {}: {error}",
+                    path.display()
+                ),
             }
         }
     }
@@ -512,14 +630,26 @@ fn place_launcher_url(options: &Value) -> String {
     let base = "https://assetgame.roblox.com/game/PlaceLauncher.ashx";
     let place = str_opt(options, "placeId");
     match options.get("type").and_then(Value::as_str).unwrap_or("") {
-        "followUser" => format!("{base}?request=RequestFollowUser&placeId={place}&userId={}", str_opt(options, "userId")),
-        "gameJob" => format!("{base}?request=RequestGameJob&placeId={place}&gameId={}", str_opt(options, "gameInstanceId")),
-        "privateServer" => format!("{base}?request=RequestPrivateGame&placeId={place}&accessCode={}", str_opt(options, "accessCode")),
+        "followUser" => format!(
+            "{base}?request=RequestFollowUser&placeId={place}&userId={}",
+            str_opt(options, "userId")
+        ),
+        "gameJob" => format!(
+            "{base}?request=RequestGameJob&placeId={place}&gameId={}",
+            str_opt(options, "gameInstanceId")
+        ),
+        "privateServer" => format!(
+            "{base}?request=RequestPrivateGame&placeId={place}&accessCode={}",
+            str_opt(options, "accessCode")
+        ),
         "reservedServer" => format!(
             "{base}?request=RequestReservedGame&placeId={place}&reservedServerAccessCode={}",
             str_opt(options, "reservedServerAccessCode")
         ),
-        "linkCode" => format!("{base}?request=RequestPrivateGame&placeId={place}&linkCode={}", str_opt(options, "linkCode")),
+        "linkCode" => format!(
+            "{base}?request=RequestPrivateGame&placeId={place}&linkCode={}",
+            str_opt(options, "linkCode")
+        ),
         _ => format!("{base}?request=RequestGame&placeId={place}&isPlayTogetherGame=false"),
     }
 }
@@ -531,9 +661,15 @@ fn fallback_url(options: &Value) -> String {
     match options.get("type").and_then(Value::as_str).unwrap_or("") {
         "deepLink" => str_opt(options, "rawUrl"),
         "followUser" => format!("{start}&userId={}", str_opt(options, "userId")),
-        "gameJob" => format!("{start}&gameInstanceId={}", str_opt(options, "gameInstanceId")),
+        "gameJob" => format!(
+            "{start}&gameInstanceId={}",
+            str_opt(options, "gameInstanceId")
+        ),
         "privateServer" => format!("{start}&accessCode={}", str_opt(options, "accessCode")),
-        "reservedServer" => format!("{start}&reservedServerAccessCode={}", str_opt(options, "reservedServerAccessCode")),
+        "reservedServer" => format!(
+            "{start}&reservedServerAccessCode={}",
+            str_opt(options, "reservedServerAccessCode")
+        ),
         "linkCode" => format!("{start}&linkCode={}", str_opt(options, "linkCode")),
         _ => start,
     }
@@ -542,25 +678,46 @@ fn fallback_url(options: &Value) -> String {
 /// `replaceGameinfo`: swaps the ticket inside a `roblox-player:` deep link.
 fn replace_gameinfo(url: &str, ticket: &str) -> String {
     url.split('+')
-        .map(|part| if part.starts_with("gameinfo:") { format!("gameinfo:{ticket}") } else { part.to_owned() })
+        .map(|part| {
+            if part.starts_with("gameinfo:") {
+                format!("gameinfo:{ticket}")
+            } else {
+                part.to_owned()
+            }
+        })
         .collect::<Vec<_>>()
         .join("+")
 }
 
-async fn build_launch_url(state: &AppState, instance: &Instance, options: Option<&Value>, auth: &AuthContext) -> LaunchResult<Option<String>> {
+async fn build_launch_url(
+    state: &AppState,
+    instance: &Instance,
+    options: Option<&Value>,
+    auth: &AuthContext,
+) -> LaunchResult<Option<String>> {
     let kind = options.and_then(|o| o.get("type")).and_then(Value::as_str);
     if product_of(instance) == "studio" {
-        let Some(options) = options else { return Ok(None) };
+        let Some(options) = options else {
+            return Ok(None);
+        };
         return match kind {
-            Some("studioEditPlace" | "studioEditAsset") => build_studio_url(state, options, auth).await,
+            Some("studioEditPlace" | "studioEditAsset") => {
+                build_studio_url(state, options, auth).await
+            }
             other => Err(LaunchError::new(
                 "STUDIO_LAUNCH_MODE_UNSUPPORTED",
-                format!("Unsupported Studio launch option: {}", other.unwrap_or("undefined")),
+                format!(
+                    "Unsupported Studio launch option: {}",
+                    other.unwrap_or("undefined")
+                ),
             )),
         };
     }
     if let Some(k @ ("studioEditPlace" | "studioEditAsset")) = kind {
-        return Err(LaunchError::new("STUDIO_OPTIONS_ON_PLAYER", format!("Player instance received Studio launch option: {k}")));
+        return Err(LaunchError::new(
+            "STUDIO_OPTIONS_ON_PLAYER",
+            format!("Player instance received Studio launch option: {k}"),
+        ));
     }
     let now = crate::util::now_millis();
     if let Some(options) = options {
@@ -580,7 +737,10 @@ async fn build_launch_url(state: &AppState, instance: &Instance, options: Option
             tracing::info!("Launching game with placeId: {place} (deep link, re-authenticated)");
             return Ok(Some(replace_gameinfo(&str_opt(options, "rawUrl"), &ticket)));
         }
-        tracing::info!("Launching {} with placeId: {place} (authenticated)", kind.unwrap_or("game"));
+        tracing::info!(
+            "Launching {} with placeId: {place} (authenticated)",
+            kind.unwrap_or("game")
+        );
         let encoded = urlencoding::encode(&place_launcher_url(options)).into_owned();
         return Ok(Some(
             [
@@ -600,10 +760,14 @@ async fn build_launch_url(state: &AppState, instance: &Instance, options: Option
     }
     let ticket = match &auth.precomputed_ticket {
         Some(ticket) => ticket.clone(),
-        None => state.auth.get_auth_ticket(auth.pinned).await.map_err(|error| {
-            tracing::warn!("Launch auth failed for {}: {error}", describe(auth));
-            LaunchError::new("ACCOUNT_AUTH_FAILED", error.to_string())
-        })?,
+        None => state
+            .auth
+            .get_auth_ticket(auth.pinned)
+            .await
+            .map_err(|error| {
+                tracing::warn!("Launch auth failed for {}: {error}", describe(auth));
+                LaunchError::new("ACCOUNT_AUTH_FAILED", error.to_string())
+            })?,
     };
     Ok(Some(
         [
@@ -618,7 +782,11 @@ async fn build_launch_url(state: &AppState, instance: &Instance, options: Option
     ))
 }
 
-async fn build_studio_url(state: &AppState, options: &Value, auth: &AuthContext) -> LaunchResult<Option<String>> {
+async fn build_studio_url(
+    state: &AppState,
+    options: &Value,
+    auth: &AuthContext,
+) -> LaunchResult<Option<String>> {
     let ticket = match state.auth.get_auth_ticket(auth.pinned).await {
         Ok(ticket) => ticket,
         Err(error) if !auth.has_cookie => {
@@ -631,7 +799,13 @@ async fn build_studio_url(state: &AppState, options: &Value, auth: &AuthContext)
     let pairs = if edit_place {
         let place: u64 = options.get("placeId").and_then(Value::as_u64).unwrap_or(0);
         let url = format!("https://apis.roblox.com/universes/v1/places/{place}/universe");
-        match state.roblox.get::<Value>(&url).await.ok().and_then(|r| r.get("universeId").and_then(Value::as_u64)) {
+        match state
+            .roblox
+            .get::<Value>(&url)
+            .await
+            .ok()
+            .and_then(|r| r.get("universeId").and_then(Value::as_u64))
+        {
             Some(universe) => vec![format!("placeId:{place}"), format!("universeId:{universe}")],
             None => {
                 tracing::warn!("Studio EditPlace aborted: no universe for placeId={place}");
@@ -650,20 +824,30 @@ async fn build_studio_url(state: &AppState, options: &Value, auth: &AuthContext)
         format!("launchtime:{}", crate::util::now_millis()),
     ];
     parts.extend(pairs);
-    parts.extend(["robloxLocale:en_us".to_owned(), "gameLocale:en_us".to_owned()]);
+    parts.extend([
+        "robloxLocale:en_us".to_owned(),
+        "gameLocale:en_us".to_owned(),
+    ]);
     Ok(Some(parts.join("+")))
 }
 
 // ------------------------------------------------------------------ process
 
-fn spawn_roblox(binary: &std::path::Path, url: Option<&str>, env: &[(String, String)]) -> std::io::Result<u32> {
+fn spawn_roblox(
+    binary: &std::path::Path,
+    url: Option<&str>,
+    env: &[(String, String)],
+) -> std::io::Result<u32> {
     let mut command = std::process::Command::new(binary);
     if let Some(url) = url {
         command.arg(url);
     }
     command.current_dir(binary.parent().unwrap_or(std::path::Path::new(".")));
     command.envs(env.iter().map(|(k, v)| (k.as_str(), v.as_str())));
-    command.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+    command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -676,7 +860,9 @@ fn spawn_roblox(binary: &std::path::Path, url: Option<&str>, env: &[(String, Str
 
 /// `handleProcessExit` + the `onExit` callback registered at startup.
 fn handle_exit(state: &AppState, id: &str, code: Option<i32>) {
-    let Some(running) = state.launch.running.lock().remove(id) else { return };
+    let Some(running) = state.launch.running.lock().remove(id) else {
+        return;
+    };
     instances::mark_stopped(state, id);
     {
         let mut registry = state.launch.registry.lock();
@@ -695,7 +881,11 @@ fn handle_exit(state: &AppState, id: &str, code: Option<i32>) {
         }
     }
     let code = code.unwrap_or(-1);
-    tracing::info!("Roblox exited: instance={id}, product={}, version={}, code={code}", running.product, running.version_hash);
+    tracing::info!(
+        "Roblox exited: instance={id}, product={}, version={}, code={code}",
+        running.product,
+        running.version_hash
+    );
     state.track(
         "launch.exit",
         json!({ "instance_id": id, "product": running.product, "version_hash": running.version_hash, "exit_code": code }),
@@ -725,20 +915,29 @@ fn monitor(state: &Arc<AppState>, id: String, pid: Option<u32>) {
     });
 }
 
-async fn launch_instance(state: &Arc<AppState>, id: &str, options: Option<Value>, initiator: Option<WebviewWindow>) -> LaunchResult<()> {
+async fn launch_instance(
+    state: &Arc<AppState>,
+    id: &str,
+    options: Option<Value>,
+    initiator: Option<WebviewWindow>,
+) -> LaunchResult<()> {
     let base = state.paths.base.clone();
-    let found = state
-        .instances
-        .get(&base, id)
-        .ok_or_else(|| LaunchError::new("INSTANCE_NOT_FOUND", format!("Instance '{id}' not found")))?;
+    let found = state.instances.get(&base, id).ok_or_else(|| {
+        LaunchError::new("INSTANCE_NOT_FOUND", format!("Instance '{id}' not found"))
+    })?;
     let instance = auto_update(state, id, found, initiator.as_ref()).await?;
     let product = product_of(&instance).to_owned();
     let options = options.or_else(|| {
-        let place = instance.get("autoLaunchPlaceId").filter(|v| !v.is_null() && *v != &json!(0))?;
+        let place = instance
+            .get("autoLaunchPlaceId")
+            .filter(|v| !v.is_null() && *v != &json!(0))?;
         (product == "player").then(|| json!({ "type": "game", "placeId": place }))
     });
     let auth = resolve_auth(state, &instance, options.as_ref()).await?;
-    let place_id = options.as_ref().and_then(|o| o.get("placeId")).and_then(Value::as_u64);
+    let place_id = options
+        .as_ref()
+        .and_then(|o| o.get("placeId"))
+        .and_then(Value::as_u64);
     if instance.get("launchAvatar").is_some_and(Value::is_object) {
         tracing::warn!("Launch avatars are not available in the Rust build yet; launching with the account avatar");
     }
@@ -751,7 +950,11 @@ async fn launch_instance(state: &Arc<AppState>, id: &str, options: Option<Value>
     apply_app_storage_overrides(state, &instance);
 
     let mut env: Vec<(String, String)> = Vec::new();
-    if instance.get("isolated").and_then(Value::as_bool).unwrap_or(false) {
+    if instance
+        .get("isolated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
         let fake_home = ensure_instance_data_dir(&base, id, &product)?;
         let tmp = format!("{}/tmp", fake_home.display());
         std::fs::create_dir_all(&tmp).map_err(LaunchError::unknown)?;
@@ -773,21 +976,31 @@ async fn launch_instance(state: &Arc<AppState>, id: &str, options: Option<Value>
         if single {
             state.launch.mutex.release();
         } else if product == "player" && !state.launch.mutex.acquire() {
-            return Err(LaunchError::new("MUTEX_ACQUIRE_FAILED", "Failed to acquire ROBLOX singleton mutex on Windows"));
+            return Err(LaunchError::new(
+                "MUTEX_ACQUIRE_FAILED",
+                "Failed to acquire ROBLOX singleton mutex on Windows",
+            ));
         }
         // CreateProcess blocks ~15s while Roblox's protected binary loads
         // (same in the Electron build), so keep it off the async workers.
-        let (binary, url, child_env) = (target.binary_path.clone(), launch_url.clone(), env.clone());
-        let pid = tauri::async_runtime::spawn_blocking(move || spawn_roblox(&binary, url.as_deref(), &child_env))
-            .await
-            .map_err(LaunchError::unknown)?
-            .map_err(|error| {
-                tracing::error!("Failed to launch Roblox: {error}");
-                LaunchError::unknown(error)
-            })?;
+        let (binary, url, child_env) =
+            (target.binary_path.clone(), launch_url.clone(), env.clone());
+        let pid = tauri::async_runtime::spawn_blocking(move || {
+            spawn_roblox(&binary, url.as_deref(), &child_env)
+        })
+        .await
+        .map_err(LaunchError::unknown)?
+        .map_err(|error| {
+            tracing::error!("Failed to launch Roblox: {error}");
+            LaunchError::unknown(error)
+        })?;
         instances::mark_launched(state, id);
         versions::mark_version_used(state, &product, &target.version_hash);
-        let name = instance.get("name").and_then(Value::as_str).unwrap_or("").to_owned();
+        let name = instance
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned();
         {
             let mut registry = state.launch.registry.lock();
             if !registry.iter().any(|e| e.instance_id == id) {
@@ -803,7 +1016,12 @@ async fn launch_instance(state: &Arc<AppState>, id: &str, options: Option<Value>
         }
         state.launch.running.lock().insert(
             id.to_owned(),
-            Running { pid: Some(pid), place_id, product: product.clone(), version_hash: target.version_hash.clone() },
+            Running {
+                pid: Some(pid),
+                place_id,
+                product: product.clone(),
+                version_hash: target.version_hash.clone(),
+            },
         );
         monitor(state, id.to_owned(), Some(pid));
         tracing::info!("Successfully launched instance '{name}' ({id})");
@@ -824,7 +1042,11 @@ async fn launch_instance(state: &Arc<AppState>, id: &str, options: Option<Value>
     Ok(())
 }
 
-async fn create_default_instance(state: &Arc<AppState>, product: &str, initiator: Option<&WebviewWindow>) -> Result<Instance, AppError> {
+async fn create_default_instance(
+    state: &Arc<AppState>,
+    product: &str,
+    initiator: Option<&WebviewWindow>,
+) -> Result<Instance, AppError> {
     let latest = versions::latest_version(state, "LIVE", product).await?;
     if !is_version_installed(&state.paths.base, &latest.client_version_upload, product) {
         begin_updating(state, product, initiator);
@@ -833,7 +1055,10 @@ async fn create_default_instance(state: &Arc<AppState>, product: &str, initiator
         finish_download_progress(state);
         result?;
     }
-    let name = DEFAULT_INSTANCE_NAMES.iter().find(|(p, _)| *p == product).map_or("My Roblox", |(_, n)| n);
+    let name = DEFAULT_INSTANCE_NAMES
+        .iter()
+        .find(|(p, _)| *p == product)
+        .map_or("My Roblox", |(_, n)| n);
     instances::create(
         state,
         instances::CreateOptions {
@@ -964,8 +1189,14 @@ mod tests {
             place_launcher_url(&game),
             "https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame&placeId=920587237&isPlayTogetherGame=false"
         );
-        assert_eq!(fallback_url(&json!({ "type": "followUser", "placeId": 1, "userId": 2 })), "roblox://experiences/start?placeId=1&userId=2");
-        assert_eq!(replace_gameinfo("roblox-player:1+gameinfo:old+launchmode:play", "new"), "roblox-player:1+gameinfo:new+launchmode:play");
+        assert_eq!(
+            fallback_url(&json!({ "type": "followUser", "placeId": 1, "userId": 2 })),
+            "roblox://experiences/start?placeId=1&userId=2"
+        );
+        assert_eq!(
+            replace_gameinfo("roblox-player:1+gameinfo:old+launchmode:play", "new"),
+            "roblox-player:1+gameinfo:new+launchmode:play"
+        );
     }
 }
 
@@ -989,9 +1220,21 @@ fn entry_json(entry: &RunningEntry) -> Value {
 pub fn register_running(router: &mut Router) {
     router
         .handle("secondScreen:getRunningInstances", |ctx, _| async move {
-            Ok(ctx.state.launch.running_list().iter().map(entry_json).collect::<Vec<_>>())
+            Ok(ctx
+                .state
+                .launch
+                .running_list()
+                .iter()
+                .map(entry_json)
+                .collect::<Vec<_>>())
         })
         .handle("secondScreen:getRecentInstances", |ctx, _| async move {
-            Ok(ctx.state.launch.recent_list().iter().map(entry_json).collect::<Vec<_>>())
+            Ok(ctx
+                .state
+                .launch
+                .recent_list()
+                .iter()
+                .map(entry_json)
+                .collect::<Vec<_>>())
         });
 }

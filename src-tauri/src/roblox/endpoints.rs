@@ -73,5 +73,8 @@ pub fn repeat_param(name: &str, ids: &[u64]) -> String {
 /// Deduplicates positive ids while keeping first-seen order (`new Set(...)`).
 pub fn unique_positive(ids: &[u64]) -> Vec<u64> {
     let mut seen = std::collections::HashSet::with_capacity(ids.len());
-    ids.iter().copied().filter(|id| *id > 0 && seen.insert(*id)).collect()
+    ids.iter()
+        .copied()
+        .filter(|id| *id > 0 && seen.insert(*id))
+        .collect()
 }

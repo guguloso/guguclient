@@ -41,12 +41,20 @@ const MAXIMIZED_CHANGED: &str = "window:maximizedChanged";
 pub fn run() {
     let paths = LauncherPaths::resolve().expect("failed to resolve launcher directories");
     let _log_guard = init_logging(&paths);
-    tracing::info!(version = env!("CARGO_PKG_VERSION"), "Application starting (Rust runtime)");
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        "Application starting (Rust runtime)"
+    );
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| on_second_instance(app, argv)))
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            on_second_instance(app, argv)
+        }))
         .plugin(tauri_plugin_notification::init())
-        .register_asynchronous_uri_scheme_protocol(services::thumbnails::PROTOCOL, services::thumbnails::protocol_handler)
+        .register_asynchronous_uri_scheme_protocol(
+            services::thumbnails::PROTOCOL,
+            services::thumbnails::protocol_handler,
+        )
         .invoke_handler(tauri::generate_handler![ipc::ipc_invoke])
         .setup(move |app| {
             let state = Arc::new(AppState::initialize(app.handle().clone(), paths)?);
@@ -67,6 +75,7 @@ pub fn run() {
                 // `before-quit`: persist debounced caches.
                 if let Some(state) = app.try_state::<Arc<AppState>>() {
                     state.social.stop();
+                    state.game_communities.flush(&state);
                 }
             }
         });
@@ -74,10 +83,16 @@ pub fn run() {
 
 /// Builds a frameless app window running the renderer with the bridge.
 /// `route` is the initial hash route (Electron's `loadFile({ hash })`).
-fn app_window_builder<'a>(app: &'a AppHandle, label: &'a str, route: Option<&str>) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+fn app_window_builder<'a>(
+    app: &'a AppHandle,
+    label: &'a str,
+    route: Option<&str>,
+) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
     let mut script = String::with_capacity(BRIDGE_JS.len() + 128);
     if let Some(route) = route {
-        script.push_str(&format!("if(!location.hash)history.replaceState(null,'','#{route}');\n"));
+        script.push_str(&format!(
+            "if(!location.hash)history.replaceState(null,'','#{route}');\n"
+        ));
     }
     script.push_str(BRIDGE_JS);
     WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
@@ -121,7 +136,9 @@ fn update_backgrounded(window: &WebviewWindow, state: &AppState) {
 
 fn init_logging(paths: &LauncherPaths) -> Option<WorkerGuard> {
     let filter = EnvFilter::try_from_env("GUGU_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
-    let builder = tracing_subscriber::fmt().with_env_filter(filter).with_target(false);
+    let builder = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false);
     if std::fs::create_dir_all(&paths.logs_dir).is_err() {
         builder.init();
         return None;
@@ -146,7 +163,10 @@ fn create_main_window(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<(
     }
     let window = builder
         .title("Gugu Client for Roblox")
-        .inner_size(resolution.width.max(MIN_WIDTH), resolution.height.max(MIN_HEIGHT))
+        .inner_size(
+            resolution.width.max(MIN_WIDTH),
+            resolution.height.max(MIN_HEIGHT),
+        )
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         // Show only once painted: no white flash on startup.
         .on_page_load(|window, payload| {
@@ -199,7 +219,11 @@ fn save_resolution(window: &WebviewWindow, state: &AppState) {
     if !maximized {
         if let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) {
             let logical = size.to_logical::<f64>(scale);
-            resolution = Resolution { width: logical.width, height: logical.height, ..resolution };
+            resolution = Resolution {
+                width: logical.width,
+                height: logical.height,
+                ..resolution
+            };
         }
     }
     resolution.maximized = maximized;
@@ -232,7 +256,12 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
                 reveal_main_window(tray.app_handle());
             }
         });

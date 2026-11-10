@@ -122,7 +122,8 @@ impl IdQuery<'_> {
             self.kind,
             self.size,
             self.format,
-            self.include_profile_frame.map_or("", |f| if f { "frame" } else { "noframe" })
+            self.include_profile_frame
+                .map_or("", |f| if f { "frame" } else { "noframe" })
         )
     }
 }
@@ -191,7 +192,9 @@ impl ThumbnailService {
             };
             let mut cache = self.ids.lock();
             for entry in entries {
-                let Some(target) = entry.target_id else { continue };
+                let Some(target) = entry.target_id else {
+                    continue;
+                };
                 match (entry.state.as_deref(), entry.image_url) {
                     (Some("Completed"), Some(url)) => {
                         result.insert(target.to_string(), to_local_url(&url));
@@ -246,7 +249,8 @@ impl ThumbnailService {
         }))
         .await?;
 
-        let mut by_correlation: HashMap<String, Map<String, Value>> = HashMap::with_capacity(misses.len());
+        let mut by_correlation: HashMap<String, Map<String, Value>> =
+            HashMap::with_capacity(misses.len());
         for mut page in pages {
             // Move the entries out of the response instead of cloning them.
             if let Some(Value::Array(entries)) = page.get_mut("data").map(Value::take) {
@@ -284,7 +288,12 @@ impl ThumbnailService {
     }
 
     /// `getSingleWithRetry`: one request, polled while Roblox renders it.
-    pub async fn get_single_with_retry(&self, request: ThumbnailRequest, max_retries: u32, retry_delay_ms: u64) -> AppResult<Value> {
+    pub async fn get_single_with_retry(
+        &self,
+        request: ThumbnailRequest,
+        max_retries: u32,
+        retry_delay_ms: u64,
+    ) -> AppResult<Value> {
         let key = request.cache_key();
         if let Some(key) = &key {
             let mut cache = self.urls.lock();
@@ -304,10 +313,18 @@ impl ThumbnailService {
         let mut retries = 0;
         loop {
             let mut page: Value = self.roblox.post(&url, &body).await?;
-            let Some(Value::Object(mut entry)) = page.get_mut("data").and_then(|d| d.get_mut(0)).map(Value::take) else {
+            let Some(Value::Object(mut entry)) = page
+                .get_mut("data")
+                .and_then(|d| d.get_mut(0))
+                .map(Value::take)
+            else {
                 return Ok(Value::Null);
             };
-            let state = entry.get("state").and_then(Value::as_str).unwrap_or("").to_owned();
+            let state = entry
+                .get("state")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned();
             if state == "Pending" && retries < max_retries {
                 retries += 1;
                 tokio::time::sleep(std::time::Duration::from_millis(retry_delay_ms)).await;
@@ -340,7 +357,13 @@ impl ThumbnailService {
             return image(bytes);
         }
         let fetched = async {
-            let response = self.roblox.http().get(&source).send().await?.error_for_status()?;
+            let response = self
+                .roblox
+                .http()
+                .get(&source)
+                .send()
+                .await?
+                .error_for_status()?;
             Ok::<_, reqwest::Error>(response.bytes().await?.to_vec())
         }
         .await;
@@ -360,7 +383,11 @@ impl ThumbnailService {
 }
 
 /// Async URI scheme handler registered on the Tauri builder.
-pub fn protocol_handler<R: Runtime>(ctx: UriSchemeContext<'_, R>, request: Request<Vec<u8>>, responder: UriSchemeResponder) {
+pub fn protocol_handler<R: Runtime>(
+    ctx: UriSchemeContext<'_, R>,
+    request: Request<Vec<u8>>,
+    responder: UriSchemeResponder,
+) {
     let state = Arc::clone(ctx.app_handle().state::<Arc<AppState>>().inner());
     let uri = request.uri().to_string();
     tauri::async_runtime::spawn(async move {
@@ -437,16 +464,20 @@ fn plain(status: StatusCode) -> Response<Vec<u8>> {
 }
 
 pub fn register(router: &mut Router) {
-    router.handle("thumbnails:getBatch", |ctx, args| async move {
-        let requests: Vec<ThumbnailRequest> = args.get(0)?;
-        ctx.state.thumbnails.get_batch(requests).await
-    })
-    .handle("thumbnails:getSingleWithRetry", |ctx, args| async move {
-        let request: ThumbnailRequest = args.get(0)?;
-        let max_retries: Option<u32> = args.opt(1)?;
-        let delay: Option<u64> = args.opt(2)?;
-        ctx.state.thumbnails.get_single_with_retry(request, max_retries.unwrap_or(5), delay.unwrap_or(1000)).await
-    });
+    router
+        .handle("thumbnails:getBatch", |ctx, args| async move {
+            let requests: Vec<ThumbnailRequest> = args.get(0)?;
+            ctx.state.thumbnails.get_batch(requests).await
+        })
+        .handle("thumbnails:getSingleWithRetry", |ctx, args| async move {
+            let request: ThumbnailRequest = args.get(0)?;
+            let max_retries: Option<u32> = args.opt(1)?;
+            let delay: Option<u64> = args.opt(2)?;
+            ctx.state
+                .thumbnails
+                .get_single_with_retry(request, max_retries.unwrap_or(5), delay.unwrap_or(1000))
+                .await
+        });
 }
 
 #[cfg(test)]
@@ -455,8 +486,13 @@ mod tests {
 
     #[test]
     fn local_urls_only_for_roblox_cdn() {
-        assert!(to_local_url("https://tr.rbxcdn.com/abc/150/150/Image/Png").starts_with(LOCAL_PREFIX));
-        assert_eq!(to_local_url("https://evil.example/x.png"), "https://evil.example/x.png");
+        assert!(
+            to_local_url("https://tr.rbxcdn.com/abc/150/150/Image/Png").starts_with(LOCAL_PREFIX)
+        );
+        assert_eq!(
+            to_local_url("https://evil.example/x.png"),
+            "https://evil.example/x.png"
+        );
         let local = to_local_url("https://tr.rbxcdn.com/abc/150/150/Image/Png");
         let persisted = to_persisted_url(&local);
         assert!(persisted.starts_with("lbx-thumb://image/?src="));

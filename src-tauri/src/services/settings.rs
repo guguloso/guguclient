@@ -58,7 +58,10 @@ impl SettingsService {
     pub fn get(&self, id: &str) -> Option<Value> {
         let default = self.defaults.get(id)?;
         Some(self.store.read(&format!("{KEY_PREFIX}.{id}"), |stored| {
-            stored.filter(|v| same_kind(v, default)).unwrap_or(default).clone()
+            stored
+                .filter(|v| same_kind(v, default))
+                .unwrap_or(default)
+                .clone()
         }))
     }
 
@@ -77,7 +80,8 @@ impl SettingsService {
             .get(id)
             .ok_or_else(|| AppError::msg(format!("Unknown setting \"{id}\"")))?;
         if same_kind(&value, default) {
-            self.store.update(|data| store::assign(data, &format!("{KEY_PREFIX}.{id}"), value))?;
+            self.store
+                .update(|data| store::assign(data, &format!("{KEY_PREFIX}.{id}"), value))?;
         }
         Ok(self.get_all())
     }
@@ -86,7 +90,11 @@ impl SettingsService {
     pub fn update(&self, patch: Map<String, Value>) -> AppResult<Map<String, Value>> {
         self.store.update(|data| {
             for (id, value) in patch {
-                if self.defaults.get(&id).is_some_and(|default| same_kind(&value, default)) {
+                if self
+                    .defaults
+                    .get(&id)
+                    .is_some_and(|default| same_kind(&value, default))
+                {
                     store::assign(data, &format!("{KEY_PREFIX}.{id}"), value);
                 }
             }
@@ -106,7 +114,12 @@ impl SettingsService {
     pub fn main_resolution(&self) -> Resolution {
         self.get("launcher-resolution-main")
             .and_then(|v| Resolution::deserialize(&v).ok())
-            .unwrap_or(Resolution { width: 1400.0, height: 800.0, maximized: false, fullscreen: false })
+            .unwrap_or(Resolution {
+                width: 1400.0,
+                height: 800.0,
+                maximized: false,
+                fullscreen: false,
+            })
     }
 
     pub fn save_main_resolution(&self, resolution: Resolution) -> AppResult<()> {
@@ -116,8 +129,13 @@ impl SettingsService {
             "maximized": resolution.maximized,
             "fullscreen": resolution.fullscreen,
         });
-        self.store
-            .update(|data| store::assign(data, &format!("{KEY_PREFIX}.launcher-resolution-main"), value))
+        self.store.update(|data| {
+            store::assign(
+                data,
+                &format!("{KEY_PREFIX}.launcher-resolution-main"),
+                value,
+            )
+        })
     }
 }
 
@@ -135,7 +153,9 @@ fn same_kind(value: &Value, default: &Value) -> bool {
 
 pub fn register(router: &mut Router) {
     router
-        .handle("settings:get", |ctx, _| async move { Ok(ctx.state.settings.get_all()) })
+        .handle("settings:get", |ctx, _| async move {
+            Ok(ctx.state.settings.get_all())
+        })
         .handle("settings:set", |ctx, mut args| async move {
             let id: String = args.get(0)?;
             let value = args.take(1);
@@ -148,5 +168,7 @@ pub fn register(router: &mut Router) {
             };
             ctx.state.settings.update(patch)
         })
-        .handle("settings:reset", |ctx, _| async move { ctx.state.settings.reset() });
+        .handle("settings:reset", |ctx, _| async move {
+            ctx.state.settings.reset()
+        });
 }

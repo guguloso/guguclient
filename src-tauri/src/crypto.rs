@@ -107,10 +107,14 @@ mod dpapi {
     /// Decrypts data protected for the current Windows user.
     pub fn unprotect(data: &[u8]) -> AppResult<Vec<u8>> {
         let input = CRYPT_INTEGER_BLOB {
-            cbData: u32::try_from(data.len()).map_err(|_| AppError::msg("DPAPI input too large"))?,
+            cbData: u32::try_from(data.len())
+                .map_err(|_| AppError::msg("DPAPI input too large"))?,
             pbData: data.as_ptr().cast_mut(),
         };
-        let mut output = CRYPT_INTEGER_BLOB { cbData: 0, pbData: std::ptr::null_mut() };
+        let mut output = CRYPT_INTEGER_BLOB {
+            cbData: 0,
+            pbData: std::ptr::null_mut(),
+        };
         // SAFETY: `input` points at `data`, which outlives the call; DPAPI only
         // reads from it. On success `output.pbData` is a LocalAlloc'd buffer of
         // `cbData` bytes that we copy and then release with LocalFree.
@@ -129,7 +133,8 @@ mod dpapi {
             return Err(AppError::Io(std::io::Error::last_os_error()));
         }
         // SAFETY: see above; the buffer is valid for `cbData` bytes until freed.
-        let bytes = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) }.to_vec();
+        let bytes =
+            unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize) }.to_vec();
         unsafe {
             LocalFree(output.pbData.cast());
         }

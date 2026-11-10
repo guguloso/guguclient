@@ -5,12 +5,13 @@
 //! `src-tauri/scripts/prepare-frontend.mjs` on every dev/build run).
 
 pub mod agreements;
-pub mod app;
 pub mod analytics;
+pub mod app;
 pub mod auth;
 pub mod cache;
 pub mod catalog;
 pub mod chat;
+pub mod communities;
 pub mod discovery;
 pub mod feature_flags;
 pub mod feeds;
@@ -61,6 +62,7 @@ pub fn register_all(router: &mut Router) {
     trade_links::register(router);
     preferences::register(router);
     feeds::register(router);
+    communities::register(router);
     thumbnails::register(router);
     social::register(router);
     feature_flags::register(router);

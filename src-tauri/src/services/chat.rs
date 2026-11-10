@@ -15,16 +15,33 @@ use crate::roblox::endpoints;
 use crate::services::poller::{Ladder, PollJob, Poller, Tier, FOREVER};
 use crate::state::AppState;
 
-const IDLE_LADDER: Ladder = &[Tier { interval_ms: 5_000, duration_ms: FOREVER }];
+const IDLE_LADDER: Ladder = &[Tier {
+    interval_ms: 5_000,
+    duration_ms: FOREVER,
+}];
 const ACTIVE_LADDER: Ladder = &[
-    Tier { interval_ms: 500, duration_ms: 30_000 },
-    Tier { interval_ms: 1_000, duration_ms: 30_000 },
-    Tier { interval_ms: 5_000, duration_ms: FOREVER },
+    Tier {
+        interval_ms: 500,
+        duration_ms: 30_000,
+    },
+    Tier {
+        interval_ms: 1_000,
+        duration_ms: 30_000,
+    },
+    Tier {
+        interval_ms: 5_000,
+        duration_ms: FOREVER,
+    },
 ];
-const BACKGROUND_LADDER: Ladder = &[Tier { interval_ms: 300_000, duration_ms: FOREVER }];
+const BACKGROUND_LADDER: Ladder = &[Tier {
+    interval_ms: 300_000,
+    duration_ms: FOREVER,
+}];
 const CONVERSATION_LIST_PAGE_SIZE: u64 = 50;
 const MESSAGES_PAGE_SIZE: u64 = 50;
-const FAILED_STATUSES: [&str; 6] = ["error", "failed", "rejected", "not_sent", "blocked", "denied"];
+const FAILED_STATUSES: [&str; 6] = [
+    "error", "failed", "rejected", "not_sent", "blocked", "denied",
+];
 
 // ------------------------------------------------------------------ mapping
 
@@ -35,7 +52,10 @@ fn b(v: &Value, k: &str) -> Value {
     Value::Bool(v.get(k).and_then(Value::as_bool).unwrap_or(false))
 }
 fn n(v: &Value, k: &str) -> Value {
-    v.get(k).filter(|x| x.is_number()).cloned().unwrap_or(json!(0))
+    v.get(k)
+        .filter(|x| x.is_number())
+        .cloned()
+        .unwrap_or(json!(0))
 }
 fn opt(out: &mut Map<String, Value>, key: &str, v: Option<&Value>) {
     if let Some(v) = v.filter(|v| !v.is_null()) {
@@ -93,7 +113,11 @@ fn transform_conversation(conv: &Value) -> Value {
         }
     }
     let mut out = Map::new();
-    let source = if conv.get("source").and_then(Value::as_str) == Some("channels") { "channels" } else { "friends" };
+    let source = if conv.get("source").and_then(Value::as_str) == Some("channels") {
+        "channels"
+    } else {
+        "friends"
+    };
     out.insert("source".into(), json!(source));
     out.insert("id".into(), conv.get("id").cloned().unwrap_or(Value::Null));
     out.insert("type".into(), s(conv, "type"));
@@ -102,19 +126,38 @@ fn transform_conversation(conv: &Value) -> Value {
     opt(&mut out, "createdBy", conv.get("created_by"));
     out.insert(
         "participantUserIds".into(),
-        conv.get("participant_user_ids").filter(|v| v.is_array()).cloned().unwrap_or(json!([])),
+        conv.get("participant_user_ids")
+            .filter(|v| v.is_array())
+            .cloned()
+            .unwrap_or(json!([])),
     );
     out.insert("userData".into(), Value::Object(user_data));
-    out.insert("messages".into(), Value::Array(visible_messages(conv.get("messages"))));
+    out.insert(
+        "messages".into(),
+        Value::Array(visible_messages(conv.get("messages"))),
+    );
     out.insert("unreadMessageCount".into(), n(conv, "unread_message_count"));
     out.insert("updatedAt".into(), s(conv, "updated_at"));
     out.insert("createdAt".into(), s(conv, "created_at"));
     out.insert("sortIndex".into(), n(conv, "sort_index"));
-    out.insert("participantPendingStatus".into(), s(conv, "participant_pending_status"));
-    out.insert("osaAcknowledgementStatus".into(), s(conv, "osa_acknowledgement_status"));
+    out.insert(
+        "participantPendingStatus".into(),
+        s(conv, "participant_pending_status"),
+    );
+    out.insert(
+        "osaAcknowledgementStatus".into(),
+        s(conv, "osa_acknowledgement_status"),
+    );
     opt(&mut out, "moderationType", conv.get("moderation_type"));
-    opt(&mut out, "userPendingStatus", conv.get("user_pending_status"));
-    if let Some(preview) = conv.get("preview_message").filter(|p| p.is_object() && !is_hidden_system(p)) {
+    opt(
+        &mut out,
+        "userPendingStatus",
+        conv.get("user_pending_status"),
+    );
+    if let Some(preview) = conv
+        .get("preview_message")
+        .filter(|p| p.is_object() && !is_hidden_system(p))
+    {
         out.insert("previewMessage".into(), transform_message(preview));
     }
     Value::Object(out)
@@ -137,10 +180,16 @@ fn classify_unavailable(metadata: &Value, info: Option<&Value>, settings: Option
         return json!({ "tag": "app-chat-disabled" });
     }
     let setting = |k: &str| settings.and_then(|s| s.get(k)).and_then(Value::as_str);
-    if meta_str("isChatEnabledByPrivacySetting") == Some("disabled") || setting("whoCanChatWithMeInApp") == Some("NoOne") {
+    if meta_str("isChatEnabledByPrivacySetting") == Some("disabled")
+        || setting("whoCanChatWithMeInApp") == Some("NoOne")
+    {
         return json!({ "tag": "privacy-restricted" });
     }
-    if !metadata.get("isChatUserMessagesEnabled").and_then(Value::as_bool).unwrap_or(false) {
+    if !metadata
+        .get("isChatUserMessagesEnabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
         return json!({ "tag": "messages-disabled" });
     }
     if setting("allowFacialAgeEstimation") == Some("Disabled") {
@@ -156,10 +205,18 @@ fn api(path: &str) -> String {
 // ------------------------------------------------------------------ service calls
 
 async fn conversation_metadata(state: &AppState) -> (u64, u64) {
-    match state.roblox.get::<Value>(&api("/get-conversation-metadata")).await {
+    match state
+        .roblox
+        .get::<Value>(&api("/get-conversation-metadata"))
+        .await
+    {
         Ok(r) => (
-            r.get("global_unread_message_count").and_then(Value::as_u64).unwrap_or(0),
-            r.get("global_unread_count").and_then(Value::as_u64).unwrap_or(0),
+            r.get("global_unread_message_count")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+            r.get("global_unread_count")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
         ),
         Err(error) => {
             tracing::error!("Failed to fetch conversation metadata: {error}");
@@ -169,7 +226,11 @@ async fn conversation_metadata(state: &AppState) -> (u64, u64) {
 }
 
 async fn chat_availability(state: &AppState, user_id: u64) -> Value {
-    let metadata = match state.roblox.get::<Value>(&api(&format!("/metadata?userId={user_id}"))).await {
+    let metadata = match state
+        .roblox
+        .get::<Value>(&api(&format!("/metadata?userId={user_id}")))
+        .await
+    {
         Ok(m) => m,
         Err(error) => {
             tracing::error!("Failed to fetch chat settings metadata: {error}");
@@ -185,7 +246,9 @@ async fn chat_availability(state: &AppState, user_id: u64) -> Value {
 }
 
 async fn user_conversations(state: &AppState, cursor: Option<String>, page_size: u64) -> Value {
-    let mut url = api(&format!("/get-user-conversations?include_user_data=true&pageSize={page_size}"));
+    let mut url = api(&format!(
+        "/get-user-conversations?include_user_data=true&pageSize={page_size}"
+    ));
     if let Some(cursor) = cursor.filter(|c| !c.is_empty()) {
         url.push_str(&format!("&cursor={}", urlencoding::encode(&cursor)));
     }
@@ -202,8 +265,16 @@ async fn user_conversations(state: &AppState, cursor: Option<String>, page_size:
     }
 }
 
-async fn conversation_messages(state: &AppState, id: &str, page_size: Option<u64>, cursor: Option<String>) -> Value {
-    let mut url = api(&format!("/get-conversation-messages?conversation_id={}", urlencoding::encode(id)));
+async fn conversation_messages(
+    state: &AppState,
+    id: &str,
+    page_size: Option<u64>,
+    cursor: Option<String>,
+) -> Value {
+    let mut url = api(&format!(
+        "/get-conversation-messages?conversation_id={}",
+        urlencoding::encode(id)
+    ));
     if let Some(size) = page_size {
         url.push_str(&format!("&page_size={size}"));
     }
@@ -213,7 +284,10 @@ async fn conversation_messages(state: &AppState, id: &str, page_size: Option<u64
     match state.roblox.get::<Value>(&url).await {
         Ok(r) => {
             let mut out = Map::new();
-            out.insert("messages".into(), Value::Array(visible_messages(r.get("messages"))));
+            out.insert(
+                "messages".into(),
+                Value::Array(visible_messages(r.get("messages"))),
+            );
             opt(&mut out, "nextCursor", r.get("next_cursor"));
             opt(&mut out, "previousCursor", r.get("previous_cursor"));
             Value::Object(out)
@@ -310,7 +384,9 @@ fn conversation_signature(c: &Value) -> String {
     [
         str_of(c.get("id")),
         str_of(c.get("updatedAt")),
-        c.get("unreadMessageCount").map(Value::to_string).unwrap_or_default(),
+        c.get("unreadMessageCount")
+            .map(Value::to_string)
+            .unwrap_or_default(),
         str_of(preview.and_then(|p| p.get("id"))),
         str_of(preview.and_then(|p| p.get("content"))),
         str_of(c.get("name")),
@@ -321,20 +397,35 @@ fn conversation_signature(c: &Value) -> String {
 
 fn message_signature(m: &Value) -> String {
     let str_of = |k: &str| m.get(k).and_then(Value::as_str).unwrap_or("").to_owned();
-    let deleted = if m.get("isDeleted").and_then(Value::as_bool).unwrap_or(false) { "1" } else { "0" };
-    [str_of("id"), str_of("content"), str_of("moderationType"), deleted.to_owned(), str_of("status"), str_of("visibility")]
-        .join("|")
+    let deleted = if m.get("isDeleted").and_then(Value::as_bool).unwrap_or(false) {
+        "1"
+    } else {
+        "0"
+    };
+    [
+        str_of("id"),
+        str_of("content"),
+        str_of("moderationType"),
+        deleted.to_owned(),
+        str_of("status"),
+        str_of("visibility"),
+    ]
+    .join("|")
 }
 
 struct MetadataJob(Weak<AppState>);
 
 impl PollJob for MetadataJob {
     fn should_run(&self) -> bool {
-        self.0.upgrade().is_some_and(|s| s.auth.current_user_id().is_some())
+        self.0
+            .upgrade()
+            .is_some_and(|s| s.auth.current_user_id().is_some())
     }
 
     async fn run(&self) -> AppResult<()> {
-        let Some(state) = self.0.upgrade() else { return Ok(()) };
+        let Some(state) = self.0.upgrade() else {
+            return Ok(());
+        };
         let (unread, _) = conversation_metadata(&state).await;
         let (increased, viewing) = {
             let d = state.chat.data.lock();
@@ -356,20 +447,35 @@ fn handle_metadata(state: &Arc<AppState>, unread: u64, conversations: Option<Vec
         let mut d = state.chat.data.lock();
         if unread != d.last_global_unread {
             d.last_global_unread = unread;
-            state.events.emit("chat:unreadCountChanged", json!({ "count": unread }));
+            state
+                .events
+                .emit("chat:unreadCountChanged", json!({ "count": unread }));
         }
-        let Some(conversations) = conversations else { return };
+        let Some(conversations) = conversations else {
+            return;
+        };
         let sigs: Vec<String> = conversations.iter().map(conversation_signature).collect();
         if d.last_conversations.as_ref() != Some(&sigs) {
             d.last_conversations = Some(sigs);
-            state.events.emit("chat:conversationsChanged", json!({ "conversations": conversations }));
+            state.events.emit(
+                "chat:conversationsChanged",
+                json!({ "conversations": conversations }),
+            );
         }
         let viewed = d.viewed.clone();
         let mut increased = false;
         for conv in &conversations {
-            let Some(key) = conv.get("id").and_then(Value::as_str) else { continue };
-            let current = conv.get("unreadMessageCount").and_then(Value::as_u64).unwrap_or(0);
-            let previous = d.last_conversation_unread.insert(key.to_owned(), current).unwrap_or(0);
+            let Some(key) = conv.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            let current = conv
+                .get("unreadMessageCount")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+            let previous = d
+                .last_conversation_unread
+                .insert(key.to_owned(), current)
+                .unwrap_or(0);
             if current > previous && viewed.as_deref() == Some(key) {
                 increased = true;
             }
@@ -388,21 +494,30 @@ fn fetch_messages(state: &Arc<AppState>, conversation_id: String) {
     }
     let state = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
-        let r = conversation_messages(&state, &conversation_id, Some(MESSAGES_PAGE_SIZE), None).await;
+        let r =
+            conversation_messages(&state, &conversation_id, Some(MESSAGES_PAGE_SIZE), None).await;
         state.chat.fetching_messages.store(false, Ordering::Release);
-        let messages = r.get("messages").and_then(Value::as_array).cloned().unwrap_or_default();
+        let messages = r
+            .get("messages")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
         let mut d = state.chat.data.lock();
         if d.viewed.as_deref() != Some(conversation_id.as_str()) {
             return;
         }
         let sigs: Vec<String> = messages.iter().map(message_signature).collect();
-        if d.last_messages.as_ref().is_some_and(|(id, prev)| *id == conversation_id && *prev == sigs) {
+        if d.last_messages
+            .as_ref()
+            .is_some_and(|(id, prev)| *id == conversation_id && *prev == sigs)
+        {
             return;
         }
         d.last_messages = Some((conversation_id.clone(), sigs));
-        state
-            .events
-            .emit("chat:messagesChanged", json!({ "conversationId": conversation_id, "messages": messages }));
+        state.events.emit(
+            "chat:messagesChanged",
+            json!({ "conversationId": conversation_id, "messages": messages }),
+        );
     });
 }
 
@@ -421,7 +536,8 @@ impl ChatPoller {
         if chat.started.swap(true, Ordering::AcqRel) {
             return;
         }
-        chat.poller.start(Arc::new(MetadataJob(Arc::downgrade(state))));
+        chat.poller
+            .start(Arc::new(MetadataJob(Arc::downgrade(state))));
         let weak = Arc::downgrade(state);
         let mut accounts = state.auth.subscribe_account_changes();
         tauri::async_runtime::spawn(async move {
@@ -435,7 +551,10 @@ impl ChatPoller {
                     d.last_messages = None;
                 }
                 state.chat.poller.stop();
-                state.chat.poller.start(Arc::new(MetadataJob(Arc::downgrade(&state))));
+                state
+                    .chat
+                    .poller
+                    .start(Arc::new(MetadataJob(Arc::downgrade(&state))));
             }
         });
         tracing::info!("[ChatPoller] Started");
@@ -579,6 +698,13 @@ mod tests {
         assert_eq!(conv["messages"].as_array().unwrap().len(), 1);
         assert_eq!(conv["userData"]["7"]["id"], 7);
         assert!(conv.get("previewMessage").is_none());
-        assert_eq!(classify_unavailable(&json!({ "isChatEnabledByGlobalRules": "disabled" }), None, None)["tag"], "account-restricted");
+        assert_eq!(
+            classify_unavailable(
+                &json!({ "isChatEnabledByGlobalRules": "disabled" }),
+                None,
+                None
+            )["tag"],
+            "account-restricted"
+        );
     }
 }

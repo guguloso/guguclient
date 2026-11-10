@@ -98,7 +98,12 @@ struct Asset {
 fn compare_semver(a: &str, b: &str) -> std::cmp::Ordering {
     let parts = |v: &str| -> Vec<u64> {
         let v = v.trim_start_matches(['v', 'V']);
-        v.split('-').next().unwrap_or("").split('.').map(|n| n.parse().unwrap_or(0)).collect()
+        v.split('-')
+            .next()
+            .unwrap_or("")
+            .split('.')
+            .map(|n| n.parse().unwrap_or(0))
+            .collect()
     };
     let (a, b) = (parts(a), parts(b));
     (0..a.len().max(b.len()))
@@ -182,7 +187,11 @@ impl UpdaterService {
         self.patch(state, |s| {
             s.status = "error";
             s.checking = false;
-            s.error = Some(UpdaterErrorInfo { code: "unknown", name: "Error", message });
+            s.error = Some(UpdaterErrorInfo {
+                code: "unknown",
+                name: "Error",
+                message,
+            });
             s.last_checked_at = Some(now_iso());
         });
         self.inner.lock().user_initiated = false;
@@ -217,7 +226,11 @@ impl UpdaterService {
 }
 
 fn window_focused(state: &AppState, label: &str) -> bool {
-    state.app.get_webview_window(label).and_then(|w| w.is_focused().ok()).unwrap_or(false)
+    state
+        .app
+        .get_webview_window(label)
+        .and_then(|w| w.is_focused().ok())
+        .unwrap_or(false)
 }
 
 pub async fn check_for_updates(state: &Arc<AppState>, user_initiated: bool) {
@@ -294,7 +307,11 @@ async fn find_update(state: &AppState) -> AppResult<Option<(String, String, u64)
         .assets
         .into_iter()
         .find(|a| a.name.to_lowercase().ends_with(".exe") && a.browser_download_url.is_some())
-        .ok_or_else(|| AppError::Message(format!("Release {raw_tag} does not include an .exe update asset")))?;
+        .ok_or_else(|| {
+            AppError::Message(format!(
+                "Release {raw_tag} does not include an .exe update asset"
+            ))
+        })?;
     let url = asset.browser_download_url.unwrap_or_default();
     Ok(Some((latest.to_owned(), url, asset.size.unwrap_or(0))))
 }
@@ -343,9 +360,15 @@ async fn download(state: &AppState, url: &str, version: &str, expected: u64) -> 
         .send()
         .await?;
     if !response.status().is_success() {
-        return Err(AppError::Message(format!("Failed to download update: HTTP {}", response.status())));
+        return Err(AppError::Message(format!(
+            "Failed to download update: HTTP {}",
+            response.status()
+        )));
     }
-    let total = response.content_length().filter(|n| *n > 0).unwrap_or(expected);
+    let total = response
+        .content_length()
+        .filter(|n| *n > 0)
+        .unwrap_or(expected);
     let mut file = tokio::fs::File::create(&dest).await?;
     let (mut transferred, mut last_bytes, mut last_time) = (0u64, 0u64, Instant::now());
     while let Some(chunk) = response.chunk().await? {
@@ -355,8 +378,16 @@ async fn download(state: &AppState, url: &str, version: &str, expected: u64) -> 
         if elapsed >= PROGRESS_REPORT_EVERY || (total > 0 && transferred >= total) {
             let elapsed_ms = elapsed.as_millis() as u64;
             let progress = Progress {
-                percent: if total > 0 { (transferred as f64 / total as f64 * 100.0).min(100.0) } else { 0.0 },
-                bytes_per_second: if elapsed_ms > 0 { (transferred - last_bytes) * 1000 / elapsed_ms } else { 0 },
+                percent: if total > 0 {
+                    (transferred as f64 / total as f64 * 100.0).min(100.0)
+                } else {
+                    0.0
+                },
+                bytes_per_second: if elapsed_ms > 0 {
+                    (transferred - last_bytes) * 1000 / elapsed_ms
+                } else {
+                    0
+                },
                 transferred,
                 total,
                 delta: transferred - last_bytes,
@@ -397,13 +428,18 @@ fn try_install_downloaded(state: &Arc<AppState>) {
     let updater = &state.updater;
     let (downloaded, bypass, user_initiated) = {
         let inner = updater.inner.lock();
-        (inner.update_downloaded, inner.bypass_focus_check, inner.user_initiated)
+        (
+            inner.update_downloaded,
+            inner.bypass_focus_check,
+            inner.user_initiated,
+        )
     };
     if !downloaded {
         return;
     }
-    let can_update =
-        bypass || window_focused(state, crate::UPDATER_WINDOW) || window_focused(state, crate::MAIN_WINDOW);
+    let can_update = bypass
+        || window_focused(state, crate::UPDATER_WINDOW)
+        || window_focused(state, crate::MAIN_WINDOW);
     if !(can_update || user_initiated) {
         updater.inner.lock().notified_deferred_install = true;
         return;
@@ -464,7 +500,9 @@ fn launch_install_script(exe: &std::path::Path) -> std::io::Result<()> {
 
 pub fn register(router: &mut Router) {
     router
-        .handle("updater:getState", |ctx, _| async move { Ok(ctx.state.updater.state()) })
+        .handle("updater:getState", |ctx, _| async move {
+            Ok(ctx.state.updater.state())
+        })
         .handle("updater:checkForUpdates", |ctx, _| async move {
             check_for_updates(&ctx.state, true).await;
             Ok(Value::Null)

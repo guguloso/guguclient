@@ -86,7 +86,9 @@ impl UserAgreementsService {
             had
         };
         if had_pending {
-            state.events.emit_main(PENDING_CHANGED, Vec::<PendingAgreement>::new());
+            state
+                .events
+                .emit_main(PENDING_CHANGED, Vec::<PendingAgreement>::new());
         }
     }
 
@@ -94,10 +96,11 @@ impl UserAgreementsService {
     fn commit(&self, state: &AppState, user_id: u64, pending: Vec<PendingAgreement>) {
         let changed = {
             let mut cached = self.cached.lock();
-            let same = cached.user_id == Some(user_id) && cached.pending.len() == pending.len() && {
-                let ids: HashSet<&str> = cached.pending.iter().map(|a| a.id.as_str()).collect();
-                pending.iter().all(|a| ids.contains(a.id.as_str()))
-            };
+            let same =
+                cached.user_id == Some(user_id) && cached.pending.len() == pending.len() && {
+                    let ids: HashSet<&str> = cached.pending.iter().map(|a| a.id.as_str()).collect();
+                    pending.iter().all(|a| ids.contains(a.id.as_str()))
+                };
             cached.user_id = Some(user_id);
             cached.pending = pending.clone();
             !same
@@ -111,15 +114,28 @@ impl UserAgreementsService {
 fn normalize(raw: Vec<RawAgreement>) -> Vec<PendingAgreement> {
     raw.into_iter()
         .filter_map(|entry| {
-            let kind = entry.agreement_type.filter(|t| SUPPORTED_TYPES.contains(&t.as_str()))?;
-            Some(PendingAgreement { id: entry.id, display_url: entry.display_url, kind })
+            let kind = entry
+                .agreement_type
+                .filter(|t| SUPPORTED_TYPES.contains(&t.as_str()))?;
+            Some(PendingAgreement {
+                id: entry.id,
+                display_url: entry.display_url,
+                kind,
+            })
         })
         .collect()
 }
 
-async fn web_request<T: serde::de::DeserializeOwned>(state: &AppState, method: Method, url: &str, body: Option<&Value>) -> AppResult<T> {
+async fn web_request<T: serde::de::DeserializeOwned>(
+    state: &AppState,
+    method: Method,
+    url: &str,
+    body: Option<&Value>,
+) -> AppResult<T> {
     let context = state.auth.web_context().await;
-    let context = context.as_ref().map(|(cookie, tracker)| (cookie.as_str(), tracker.as_str()));
+    let context = context
+        .as_ref()
+        .map(|(cookie, tracker)| (cookie.as_str(), tracker.as_str()));
     state.roblox.request_web(method, url, body, context).await
 }
 
@@ -129,11 +145,16 @@ pub async fn refresh(state: &AppState) -> Vec<PendingAgreement> {
         return Vec::new();
     };
     let _guard = state.agreements.refresh_lock.lock().await;
-    let url = format!("{}/agreements-resolution/web", endpoints::USER_AGREEMENTS_V1);
+    let url = format!(
+        "{}/agreements-resolution/web",
+        endpoints::USER_AGREEMENTS_V1
+    );
     match web_request::<Vec<RawAgreement>>(state, Method::GET, &url, None).await {
         Ok(raw) => {
             if state.auth.current_user_id() != Some(user_id) {
-                return state.agreements.cached_pending(state.auth.current_user_id());
+                return state
+                    .agreements
+                    .cached_pending(state.auth.current_user_id());
             }
             let pending = normalize(raw);
             state.agreements.commit(state, user_id, pending.clone());
@@ -151,7 +172,9 @@ pub async fn refresh(state: &AppState) -> Vec<PendingAgreement> {
 }
 
 async fn get_pending(state: &AppState) -> Vec<PendingAgreement> {
-    let Some(user_id) = state.auth.current_user_id() else { return Vec::new() };
+    let Some(user_id) = state.auth.current_user_id() else {
+        return Vec::new();
+    };
     {
         let cached = state.agreements.cached.lock();
         if cached.user_id == Some(user_id) {
@@ -166,7 +189,9 @@ async fn accept(state: &AppState, ids: Vec<String>) -> AppResult<Value> {
         return Ok(json!([]));
     }
     if state.auth.current_user_id().is_none() {
-        return Err(AppError::Message("Cannot accept agreements without an active account".into()));
+        return Err(AppError::Message(
+            "Cannot accept agreements without an active account".into(),
+        ));
     }
     let url = format!("{}/acceptances", endpoints::USER_AGREEMENTS_V1);
     let body = json!({ "acceptances": ids.iter().map(|id| json!({ "agreementId": id })).collect::<Vec<_>>() });
@@ -186,8 +211,12 @@ async fn accept(state: &AppState, ids: Vec<String>) -> AppResult<Value> {
 
 pub fn register(router: &mut Router) {
     router
-        .handle("userAgreements:getPending", |ctx, _| async move { Ok(get_pending(&ctx.state).await) })
-        .handle("userAgreements:refresh", |ctx, _| async move { Ok(refresh(&ctx.state).await) })
+        .handle("userAgreements:getPending", |ctx, _| async move {
+            Ok(get_pending(&ctx.state).await)
+        })
+        .handle("userAgreements:refresh", |ctx, _| async move {
+            Ok(refresh(&ctx.state).await)
+        })
         .handle("userAgreements:accept", |ctx, args| async move {
             let ids: Vec<String> = args.get(0)?;
             accept(&ctx.state, ids).await

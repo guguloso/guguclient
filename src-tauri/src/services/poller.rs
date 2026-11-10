@@ -64,7 +64,10 @@ fn pick_tier(elapsed_ms: u64, ladder: Ladder) -> Tier {
 fn error_backoff(attempt: u32) -> u64 {
     match attempt {
         0 => 0,
-        n => ERROR_BACKOFF_STEPS_MS.get(n as usize - 1).copied().unwrap_or(ERROR_BACKOFF_CAP_MS),
+        n => ERROR_BACKOFF_STEPS_MS
+            .get(n as usize - 1)
+            .copied()
+            .unwrap_or(ERROR_BACKOFF_CAP_MS),
     }
 }
 
@@ -96,7 +99,9 @@ impl Poller {
             control.consecutive_errors = 0;
         }
         let poller = Arc::clone(self);
-        *task = Some(tauri::async_runtime::spawn(async move { poller.run_loop(job).await }));
+        *task = Some(tauri::async_runtime::spawn(async move {
+            poller.run_loop(job).await
+        }));
     }
 
     /// Stops polling; an in-flight cycle is dropped (aborted).
@@ -141,7 +146,10 @@ impl Poller {
         };
         let elapsed = control.triggered_at.elapsed().as_millis() as u64;
         let tier = pick_tier(elapsed, ladder);
-        Duration::from_millis(tier.interval_ms.max(error_backoff(control.consecutive_errors)))
+        Duration::from_millis(
+            tier.interval_ms
+                .max(error_backoff(control.consecutive_errors)),
+        )
     }
 
     async fn run_loop<J: PollJob>(self: Arc<Self>, job: Arc<J>) {
@@ -173,8 +181,14 @@ mod tests {
     use super::*;
 
     const LADDER: Ladder = &[
-        Tier { interval_ms: 30_000, duration_ms: 60_000 },
-        Tier { interval_ms: 300_000, duration_ms: FOREVER },
+        Tier {
+            interval_ms: 30_000,
+            duration_ms: 60_000,
+        },
+        Tier {
+            interval_ms: 300_000,
+            duration_ms: FOREVER,
+        },
     ];
 
     #[test]
@@ -188,6 +202,9 @@ mod tests {
     #[test]
     fn backoff_matches_electron() {
         let steps: Vec<u64> = (0..8).map(error_backoff).collect();
-        assert_eq!(steps, [0, 1_000, 2_000, 5_000, 15_000, 30_000, 60_000, 60_000]);
+        assert_eq!(
+            steps,
+            [0, 1_000, 2_000, 5_000, 15_000, 30_000, 60_000, 60_000]
+        );
     }
 }

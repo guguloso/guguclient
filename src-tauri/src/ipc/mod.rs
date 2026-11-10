@@ -41,7 +41,9 @@ pub struct Router {
 impl Router {
     /// Builds the router with every ported service registered.
     pub fn build() -> Self {
-        let mut router = Self { routes: HashMap::with_capacity(400) };
+        let mut router = Self {
+            routes: HashMap::with_capacity(400),
+        };
         crate::services::register_all(&mut router);
         router
     }
@@ -88,12 +90,19 @@ pub async fn ipc_invoke(
     args: Vec<Value>,
 ) -> Result<Value, AppError> {
     let started = Instant::now();
-    let ctx = Ctx { state: Arc::clone(&state), window };
+    let ctx = Ctx {
+        state: Arc::clone(&state),
+        window,
+    };
     let label = channel.clone();
     let result = router.dispatch(ctx, channel, args).await;
     match &result {
-        Ok(_) => tracing::trace!(channel = %label, elapsed_ms = started.elapsed().as_millis(), "ipc ok"),
-        Err(AppError::NotImplemented(_)) => tracing::debug!(channel = %label, "ipc channel not ported yet"),
+        Ok(_) => {
+            tracing::trace!(channel = %label, elapsed_ms = started.elapsed().as_millis(), "ipc ok")
+        }
+        Err(AppError::NotImplemented(_)) => {
+            tracing::debug!(channel = %label, "ipc channel not ported yet")
+        }
         Err(error) => tracing::warn!(channel = %label, %error, "ipc failed"),
     }
     result
