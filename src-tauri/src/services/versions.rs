@@ -212,6 +212,11 @@ fn registry_path(state: &AppState, product: &str) -> PathBuf {
 
 /// `readInstalledVersionsMetadata`, with the legacy-field migration.
 fn read_registry(state: &AppState, product: &str) -> Vec<Value> {
+    registry_entries(state, product)
+}
+
+/// `readInstalledVersionsMetadata`.
+pub fn registry_entries(state: &AppState, product: &str) -> Vec<Value> {
     let Some(Value::Array(list)) = read_json(&registry_path(state, product)) else {
         return Vec::new();
     };
@@ -255,6 +260,11 @@ fn read_registry(state: &AppState, product: &str) -> Vec<Value> {
         save_registry(state, product, &out);
     }
     out
+}
+
+/// `saveInstalledVersions`.
+pub fn save_registry_entries(state: &AppState, product: &str, versions: &[Value]) {
+    save_registry(state, product, versions);
 }
 
 fn save_registry(state: &AppState, product: &str, versions: &[Value]) {
@@ -627,6 +637,7 @@ pub async fn download_version(
     info: VersionInfo,
     source: &str,
 ) -> AppResult<Value> {
+    crate::services::version_maintenance::wait_for_cleanup(state).await;
     let key = format!("{}:{}", info.product, info.client_version_upload);
     let shared = {
         let mut active = state.versions.active.lock();
@@ -658,7 +669,7 @@ pub fn is_downloading(state: &AppState, reference: Option<(&str, &str)>) -> bool
     }
 }
 
-async fn remove_version(state: &AppState, hash: &str, product: &str) -> AppResult<()> {
+pub async fn remove_version(state: &AppState, hash: &str, product: &str) -> AppResult<()> {
     let dir = layout::version_install_dir(&state.paths.base, hash, product)?;
     if dir.exists() {
         tokio::fs::remove_dir_all(&dir).await?;
@@ -672,7 +683,7 @@ async fn remove_version(state: &AppState, hash: &str, product: &str) -> AppResul
     Ok(())
 }
 
-async fn check_for_update(state: &AppState, channel: &str, product: &str) -> AppResult<Value> {
+pub async fn check_for_update(state: &AppState, channel: &str, product: &str) -> AppResult<Value> {
     let latest = match latest_or_unavailable(state, channel, product).await? {
         Ok(latest) => latest,
         Err(ChannelUnavailable) => {
@@ -743,6 +754,7 @@ pub fn register(router: &mut Router) {
                 "version.download",
                 json!({ "version_hash": info.client_version_upload, "channel": info.channel, "product": info.product }),
             );
+            crate::services::version_maintenance::cleanup_after_download(state);
             Ok(installed)
         })
         .handle("versions:isDownloading", |ctx, args| async move {

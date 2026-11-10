@@ -76,6 +76,7 @@ pub fn run() {
                 if let Some(state) = app.try_state::<Arc<AppState>>() {
                     state.social.stop();
                     crate::services::game_avatar::stop(&state);
+                    crate::services::version_maintenance::stop_background_updates(&state);
                     state.game_communities.flush(&state);
                 }
             }

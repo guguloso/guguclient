@@ -1,7 +1,7 @@
 //! Avatar marketplace (`catalog:*`, `cart:*`). Port of `CatalogService`,
 //! `CatalogItemDetailsFetcher`, `ItemDetailsCacheService` and `CartService`.
 //!
-//! Pending: `purchaseItem`, `checkoutCart` (Robux purchases).
+//! Purchases live in `purchases.rs`.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;

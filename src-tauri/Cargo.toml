@@ -19,6 +19,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
+# Native open/save dialogs (Electron `dialog.showOpenDialog`).
+rfd = { version = "0.15", default-features = false }
 
 # Serialization: the IPC contract is JSON, identical to Electron's.
 serde = { version = "1", features = ["derive", "rc"] }
