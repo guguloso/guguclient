@@ -57,6 +57,7 @@ pub struct AppState {
     pub forums: crate::services::forums::ForumsState,
     pub private_servers: crate::services::private_servers::PrivateServersState,
     pub avatar: crate::services::avatar::AvatarState,
+    pub outfits: crate::services::outfits::OutfitsState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -104,6 +105,7 @@ impl AppState {
             forums: Default::default(),
             private_servers: Default::default(),
             avatar: Default::default(),
+            outfits: Default::default(),
             game_communities: Default::default(),
             app,
             events,

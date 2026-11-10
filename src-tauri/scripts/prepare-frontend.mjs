@@ -34,6 +34,16 @@ widen("connect-src", "ipc: http://ipc.localhost");
 widen("img-src", "http://lbx-thumb.localhost");
 fs.writeFileSync(indexPath, html);
 
+// Renderer-built thumbnail URLs use the Electron-only `lbx-thumb://` scheme;
+// WebView2 reaches the Rust protocol at `http://lbx-thumb.localhost` instead.
+for (const file of fs.readdirSync(path.join(dist, "assets"))) {
+  if (!file.endsWith(".js")) continue;
+  const p = path.join(dist, "assets", file);
+  const js = fs.readFileSync(p, "utf8");
+  const patched = js.replace("`${THUMBNAIL_PROTOCOL_SCHEME}://${OUTFIT_THUMBNAIL_HOST}/", "`http://lbx-thumb.localhost/${OUTFIT_THUMBNAIL_HOST}/");
+  if (patched !== js) fs.writeFileSync(p, patched);
+}
+
 // ---------------------------------------------------------------- 3. bridge
 let preload = fs.readFileSync(preloadSrc, "utf8").replace(/\r\n/g, "\n");
 const start = preload.indexOf("function handler()");

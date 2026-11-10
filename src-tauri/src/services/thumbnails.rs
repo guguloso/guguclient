@@ -400,6 +400,20 @@ pub fn protocol_handler<R: Runtime>(
 ) {
     let state = Arc::clone(ctx.app_handle().state::<Arc<AppState>>().inner());
     let uri = request.uri().to_string();
+    // `outfit` host: captured outfit previews (`ThumbnailProtocolService` routes).
+    let path = request.uri().path().to_owned();
+    if let Some(rest) = path.strip_prefix("/outfit/") {
+        let response = match crate::services::outfits::serve_thumbnail(&state, rest) {
+            Some(bytes) => Response::builder()
+                .header("Content-Type", "image/png")
+                .header("Cache-Control", "private, max-age=86400, immutable")
+                .body(bytes)
+                .unwrap_or_else(|_| plain(StatusCode::NOT_FOUND)),
+            None => plain(StatusCode::NOT_FOUND),
+        };
+        responder.respond(response);
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         responder.respond(state.thumbnails.serve(&uri).await);
     });

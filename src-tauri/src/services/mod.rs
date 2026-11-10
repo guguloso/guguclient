@@ -24,6 +24,7 @@ pub mod instances;
 pub mod inventory;
 pub mod launch;
 pub mod metadata;
+pub mod outfits;
 pub mod pinned_communities;
 pub mod poller;
 pub mod preferences;
@@ -73,6 +74,7 @@ pub fn register_all(router: &mut Router) {
     trades::register(router);
     private_servers::register(router);
     avatar::register(router);
+    outfits::register(router);
     thumbnails::register(router);
     social::register(router);
     feature_flags::register(router);
