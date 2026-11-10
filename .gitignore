@@ -1,0 +1,27 @@
+# Binaries and installers
+*.exe
+*.dll
+*.node
+*.7z
+*.asar
+*.pak
+*.bin
+*.wasm
+*.dat
+*.log
+
+# Build and dependencies
+node_modules/
+build/work/
+build/node_modules/
+temp_fix/node_modules/
+lunar-extracted/
+app-asar/
+
+# Legacy decompiler reference files
+BUILDING.md
+docs/
+installer/
+native/
+src/
+tools/
