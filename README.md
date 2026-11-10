@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-    A custom Roblox launcher &amp; client engineered for performance tuning, clean monochrome aesthetics, and full customization.
+    A lightweight, high-performance Roblox launcher &amp; client built for clean aesthetics, FastFlag tuning, and deep customization.
 </p>
 
 <p align="center">
@@ -26,89 +26,61 @@
 </div>
 
 > [!CAUTION]
-> The official repository [guguloso/guguclient](https://github.com/guguloso/guguclient) is the **ONLY PLACE** where you should download the official Gugu Client binary/executable. Any other source is **NOT** affiliated with us and poses a potential security risk.
+> The official repository [guguloso/guguclient](https://github.com/guguloso/guguclient) is the **ONLY PLACE** where you should download the official Gugu Client executable. Any other source is **NOT** affiliated with us and may pose a potential security threat.
 
 ---
 
-## Performance &amp; Optimization
+## Key Features &amp; Improvements
 
-Gugu Client is structured to keep overhead low between the Electron launcher shell and the Roblox Player process:
+### Performance &amp; Optimization
+- **FastFlag Profiles &amp; Editor**: Unlock FPS caps, adjust lighting/rendering quality, tweak textures, and disable unnecessary telemetry before Roblox launches
+- **Zero Background Bloat**: Runs strictly when you play — no persistent startup services or hidden background updaters eating RAM
+- **Low Overhead**: Fast process detection with minimal CPU/memory footprint while you are in-game
+- **Clean Storage**: Automatically cleans up old runtime caches after updates while keeping your settings and profiles safe
 
-- **FastFlag Tuning &amp; Profiles**: Configure and apply custom ClientAppSettings / FastFlags before Roblox initializes, enabling FPS uncap adjustments, VSync toggles, rendering pipeline tweaks, and reduced telemetry overhead per instance.
-- **Zero Persistent Background Services**: Unlike traditional installers that register background update daemons or startup services, Gugu Client runs strictly on demand and cleans up its process tree on quit.
-- **Native Win32 Process Monitoring**: Uses lightweight native C addons (`fastlist`, `get-windows`, `koffi`) instead of heavy PowerShell/WMI polling loops to detect active Roblox sessions, window focus, and crash/disconnect transitions with minimal CPU usage.
-- **Automatic Old-Version Cleanup**: When updating via the built-in GitHub updater, the C# portable bootstrapper automatically removes obsolete `portable-*` runtime directories from `%LOCALAPPDATA%\GuguClientForRoblox\` on first boot, preventing disk bloat while preserving user settings in `%APPDATA%\Gugu Client for Roblox\`.
-- **Hardware-Accelerated UI with Dynamic Vector/Alpha Masking**: Launcher branding (`BrandMark`) uses CSS `mask-image` alpha masking rather than redundant per-theme image bundles, reducing renderer memory footprint while adapting seamlessly across opacities and components.
+### Integrations &amp; Discord RPC
+- Custom **Discord Rich Presence** that displays the experience you're playing, creator name, and active session playtime
+- Quick **See game page** and **Join Server** buttons directly on your Discord profile
+- Full **Bloxstrap RPC** support for dynamic in-game status updates
+- Native `roblox://` deep-link support — click Play on the Roblox website and launch seamlessly through Gugu Client
 
----
+### Mods &amp; Customization
+- Customize cursors, sounds, fonts, and game assets per instance
+- Sleek dark-themed launcher UI with minimal visual clutter
+- Built-in macro engine and Roblox Studio launching support
 
-## Key Features
-
-### Integrations &amp; Discord Rich Presence
-- Custom **Gugu For Roblox** Discord Rich Presence (`1569564533830324315`) displaying:
-  - Launcher idle status (`Active in Launcher` with the `logo` artwork)
-  - Active Roblox game metadata (experience title, creator name, session timer, and direct **See game page** button)
-  - Custom in-game main art (`playing`) paired with the transparent corner badge (`logo2`)
-- Full **Bloxstrap RPC** protocol support (`SetRichPresence`, `SetLaunchData` with **Join Server** deep-links, rate-limiting, and asset thumbnail caching)
-- System default `roblox://` protocol handler integration with automatic focus restoration
-
-### Native GitHub Auto-Updater
-- Custom `UpdaterService` querying the GitHub Releases API (`guguloso/guguclient`) directly — zero external update servers required
-- Dedicated updater UI window (`#/updater`) showing current-to-target version transitions and real-time MB/s download progress
-- Seamless in-place replacement of the portable launcher binary (`GUGU_PORTABLE_EXE`) followed by automatic extraction and relaunch
-
-### Mods, Macros &amp; Multi-Instance
-- Per-instance mod overlays and Roblox asset customization (Player &amp; Studio)
-- Built-in Roblox account manager and quick account switching
-- Multi-instance launch support with running instance tracking in both the title bar and system tray
-- Integrated macro policy &amp; trigger service
+### Multi-Instance &amp; Accounts
+- **Account Switcher**: Manage and switch between multiple Roblox accounts in one click
+- **Multi-Instance Support**: Launch and track multiple Roblox sessions simultaneously from the title bar or system tray
+- **Automatic Updates**: Built-in **Check for Updates** downloads and installs new releases directly from GitHub with zero manual setup
 
 ---
 
-## Repository Layout
+## Quick Start
 
-This repository contains the complete source tree, native C reconstructions, installer scripts, documentation, and portable build pipeline:
+1. Download the latest release (`GuguClientForRoblox-Portable-x.x.x.exe`) from the [Releases][repo-releases] page.
+2. Run the executable — it sets up automatically in portable mode with no installer wizard required.
+3. Configure your FastFlags, Mods, or Discord RPC preferences and launch any Roblox game.
 
-| Directory / File | Description |
-| :--- | :--- |
-| `temp_fix/` | Active Gugu Client Electron payload (`out/main`, `out/preload`, `out/renderer`, `resources/`, `package.json`) used to build releases |
-| `src/` | Readable, formatted Electron main, preload, and renderer source bundles (`main/index.js`, `renderer/index.js`, `consts.js`) |
-| `native/` | Decompiled native Win32 C sources (`owutility`, `integrity`, `fastlist`, `get-windows`, `koffi`, Chromium/NSIS shims) |
-| `build/` | Portable bootstrapper (`PortableLauncher.cs`), icon generator (`make_icons.ps1`), and 1-command release compiler (`repack_and_build.ps1`) |
-| `installer/` | NSIS installer and uninstaller scripts |
-| `docs/` | Technical notes covering IPC channels, service architecture, bundle structure, and native DLL internals |
-| `tools/` | Extraction and inspection utilities |
-| `.github/` | Automated CI verification workflow (`ci.yml`) and issue templates |
+### System Requirements
+- **OS:** Windows 10 or Windows 11 (64-bit)
+- **Dependencies:** None (self-contained portable executable)
 
 ---
 
-## System Requirements
-
-- **Operating System:** Windows 10 or Windows 11 (64-bit / x64)
-- **Runtime:** Self-contained (Electron + Chromium embedded inside the portable `.exe`; .NET Framework 4.x ships with Windows)
-- **Network:** Required for Roblox game launches, game metadata resolution, Discord RPC thumbnails, and GitHub update checks
-
----
-
-## Building from Source &amp; Releasing Updates
-
-See [BUILDING.md](./BUILDING.md) for full details. To compile a new portable release locally (Windows 10/11 with Node.js v20+):
+## Building from Source
 
 ```powershell
-# Bumps version, regenerates icons & PE headers, packs app.asar, and builds the portable .exe
 .\build\repack_and_build.ps1 -Version 1.0.17
 ```
 
-To push an update to all users:
-1. Create a new GitHub Release in `guguloso/guguclient` tagged `v1.0.17`.
-2. Attach the generated `GuguClientForRoblox-Portable-1.0.17.exe` binary.
-3. Publish — any user clicking **Check for Updates** in the client will automatically download and install the update.
+See [BUILDING.md](./BUILDING.md) for full build instructions.
 
 ---
 
 ## Licensing
 
-Custom additions, build scripts, and launcher modifications in this repository are licensed under the [MIT License](./LICENSE).
+Custom additions and build tooling in this repository are licensed under the [MIT License](./LICENSE).
 
 ## Stargazing
 
