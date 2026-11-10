@@ -30,6 +30,7 @@ pub mod launch;
 pub mod launcher_notifications;
 pub mod metadata;
 pub mod mission_control;
+pub mod mods;
 pub mod outfit_wear;
 pub mod outfits;
 pub mod pinned_communities;
@@ -89,6 +90,7 @@ pub fn register_all(router: &mut Router) {
     purchases::register(router);
     fonts::register(router);
     activity::register(router);
+    mods::register(router);
     version_maintenance::register(router);
     game_avatar::register(router);
     thumbnails::register(router);

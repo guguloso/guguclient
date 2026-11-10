@@ -99,11 +99,22 @@ pub(crate) fn app_window_builder<'a>(
         ));
     }
     script.push_str(BRIDGE_JS);
-    WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+    #[allow(unused_mut)]
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
         .decorations(false)
         .visible(false)
         .background_color(Color(5, 5, 5, 255))
-        .initialization_script(&script)
+        .initialization_script(&script);
+    // Debug builds only: `GUGU_DEBUG_PORT=9333` exposes the WebView2 DevTools
+    // protocol for automated UI checks. Every window shares one WebView2
+    // environment, so they must all be created with the same arguments.
+    #[cfg(debug_assertions)]
+    if let Ok(port) = std::env::var("GUGU_DEBUG_PORT") {
+        builder = builder.additional_browser_args(&format!(
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port}"
+        ));
+    }
+    builder
 }
 
 /// `UpdaterWindowService.showUpdaterWindow`: 560×470, fixed size, frameless.
@@ -164,17 +175,7 @@ fn init_logging(paths: &LauncherPaths) -> Option<WorkerGuard> {
 
 fn create_main_window(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<()> {
     let resolution = state.settings.main_resolution();
-    #[allow(unused_mut)]
-    let mut builder = app_window_builder(app, MAIN_WINDOW, None);
-    // Debug builds only: `GUGU_DEBUG_PORT=9333` exposes the WebView2 DevTools
-    // protocol for automated UI checks. Keeps Tauri's default feature flags.
-    #[cfg(debug_assertions)]
-    if let Ok(port) = std::env::var("GUGU_DEBUG_PORT") {
-        builder = builder.additional_browser_args(&format!(
-            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port={port}"
-        ));
-    }
-    let window = builder
+    let window = app_window_builder(app, MAIN_WINDOW, None)
         .title("Gugu Client for Roblox")
         .inner_size(
             resolution.width.max(MIN_WIDTH),

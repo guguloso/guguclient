@@ -424,29 +424,12 @@ fn validate_target(state: &AppState, instance: &Instance) -> LaunchResult<Launch
             format!("Version '{display}' ({hash}) is not installed. Please download it first."),
         ));
     }
-    let install_dir = version_install_dir(base, &hash, product)?;
+    let mut install_dir = version_install_dir(base, &hash, product)?;
     if product == "player" {
-        let id = instance
-            .get("id")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let manifest = layout::instance_config_dir(base, id, product)
-            .ok()
-            .and_then(|d| read_json(&d.join("mods-manifest.json")));
-        let has_mods = manifest
-            .as_ref()
-            .and_then(|m| m.get("mods"))
-            .and_then(Value::as_array)
-            .is_some_and(|mods| {
-                mods.iter()
-                    .any(|m| m.get("enabled").and_then(Value::as_bool).unwrap_or(false))
-            });
-        let has_font = instance.get("customFont").is_some_and(|f| !f.is_null());
-        if has_mods || has_font {
-            return Err(LaunchError::new(
-                "MOD_RUNTIME_PREP_FAILED",
-                "Mods and custom fonts are not available in the Rust build yet",
-            ));
+        match crate::services::mods::prepare_runtime(state, instance) {
+            Ok(Some(runtime)) => install_dir = runtime,
+            Ok(None) => {}
+            Err(error) => return Err(LaunchError::new("MOD_RUNTIME_PREP_FAILED", error)),
         }
     }
     let binary_path = layout::binary_path(&install_dir, product);
