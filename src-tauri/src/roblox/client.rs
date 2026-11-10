@@ -99,6 +99,12 @@ impl RobloxClient {
         Self::decode(url, response).await
     }
 
+    /// POST with the session cookie; returns only the HTTP status.
+    pub async fn post_raw<B: Serialize + ?Sized>(&self, url: &str, body: &B) -> AppResult<u16> {
+        let bytes = Bytes::from(serde_json::to_vec(body)?);
+        Ok(self.send(Method::POST, url, Some(bytes), Auth::Session).await?.status().as_u16())
+    }
+
     /// GET with the session cookie, returning the raw response (status-aware callers).
     pub async fn get_raw(&self, url: &str) -> AppResult<Response> {
         self.send(Method::GET, url, None, Auth::Session).await

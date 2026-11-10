@@ -53,6 +53,7 @@ pub struct AppState {
     pub misc: crate::services::app::AppMisc,
     pub protocol: crate::services::protocol::ProtocolService,
     pub game_preferences: crate::services::preferences::GamePreferences,
+    pub feeds: crate::services::feeds::FeedsState,
 }
 
 impl AppState {
@@ -87,6 +88,7 @@ impl AppState {
             misc: Default::default(),
             protocol: Default::default(),
             game_preferences: crate::services::preferences::GamePreferences::open(&paths)?,
+            feeds: Default::default(),
             app,
             events,
             roblox,

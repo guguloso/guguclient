@@ -13,6 +13,7 @@ pub mod catalog;
 pub mod chat;
 pub mod discovery;
 pub mod feature_flags;
+pub mod feeds;
 pub mod friends;
 pub mod game_lists;
 pub mod games;
@@ -59,6 +60,7 @@ pub fn register_all(router: &mut Router) {
     inventory::register(router);
     trade_links::register(router);
     preferences::register(router);
+    feeds::register(router);
     thumbnails::register(router);
     social::register(router);
     feature_flags::register(router);
