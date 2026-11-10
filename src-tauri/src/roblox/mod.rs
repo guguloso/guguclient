@@ -3,4 +3,4 @@
 mod client;
 pub mod endpoints;
 
-pub use client::RobloxClient;
+pub use client::{Challenge, ChallengeOutcome, ReplayRequest, RobloxClient};

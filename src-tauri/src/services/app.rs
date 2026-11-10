@@ -39,7 +39,7 @@ pub struct AppMisc {
 
 // ------------------------------------------------------------------ external links
 
-fn is_external_open_allowed(url: &str) -> bool {
+pub(crate) fn is_external_open_allowed(url: &str) -> bool {
     Url::parse(url).is_ok_and(|u| ALLOWED_SCHEMES.contains(&u.scheme().to_lowercase().as_str()))
 }
 
@@ -64,7 +64,7 @@ fn user_trusted_domains(state: &AppState) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn domain_requiring_confirmation(state: &AppState, url: &str) -> Option<String> {
+pub(crate) fn domain_requiring_confirmation(state: &AppState, url: &str) -> Option<String> {
     if !state.settings.get_bool("confirm-external-links") {
         return None;
     }
@@ -90,7 +90,7 @@ pub fn open_external_url(url: &str) {
     let _ = url;
 }
 
-fn perform_external_open(state: &AppState, url: &str, source_route: Option<Value>) {
+pub(crate) fn perform_external_open(state: &AppState, url: &str, source_route: Option<Value>) {
     state.track(
         "external.open",
         json!({ "url": url, "source_route": source_route }),

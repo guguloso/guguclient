@@ -35,12 +35,47 @@ enum Auth<'a> {
     },
 }
 
+const CHALLENGE_ID_HEADER: &str = "rblx-challenge-id";
+const CHALLENGE_TYPE_HEADER: &str = "rblx-challenge-type";
+const CHALLENGE_METADATA_HEADER: &str = "rblx-challenge-metadata";
+const MAX_CHALLENGE_RETRIES: u32 = 3;
+
+/// A Roblox generic challenge (`parseChallengeHeaders`).
+#[derive(Clone, Debug)]
+pub struct Challenge {
+    pub id: String,
+    pub kind: String,
+    pub metadata: String,
+}
+
+/// The request a challenge interrupted (`createChallengeRequestContext`).
+#[derive(Clone, Debug)]
+pub struct ReplayRequest {
+    pub url: String,
+    pub method: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<String>,
+    pub replay_supported: bool,
+}
+
+/// What the challenge handler decided.
+pub enum ChallengeOutcome {
+    /// Retry with these `rblx-challenge-*` values.
+    Retry(Challenge),
+    /// Use this response instead (the captcha replay popup's).
+    Respond(Response),
+}
+
+pub type ChallengeHandler =
+    Arc<dyn Fn(Challenge, ReplayRequest) -> futures::future::BoxFuture<'static, Option<ChallengeOutcome>> + Send + Sync>;
+
 /// Shared, connection-pooled Roblox client. Cheap to share via `Arc`; the
 /// cookie and CSRF token sit behind short-lived locks never held across `.await`.
 pub struct RobloxClient {
     http: reqwest::Client,
     cookie: RwLock<Option<Arc<str>>>,
     csrf: RwLock<Option<HeaderValue>>,
+    challenge_handler: RwLock<Option<ChallengeHandler>>,
 }
 
 impl RobloxClient {
@@ -57,12 +92,23 @@ impl RobloxClient {
             http,
             cookie: RwLock::new(None),
             csrf: RwLock::new(None),
+            challenge_handler: RwLock::new(None),
         })
     }
 
     /// Raw client for non-API downloads (thumbnail images, etc.).
     pub fn http(&self) -> &reqwest::Client {
         &self.http
+    }
+
+    /// `rozod.setHandleGenericChallenge`.
+    pub fn set_challenge_handler(&self, handler: ChallengeHandler) {
+        *self.challenge_handler.write() = Some(handler);
+    }
+
+    /// The active session cookie (`getAuthCookie`).
+    pub fn session_cookie(&self) -> Option<String> {
+        self.cookie.read().as_deref().map(str::to_owned)
     }
 
     pub fn set_cookie(&self, cookie: Option<&str>) {
@@ -225,6 +271,8 @@ impl RobloxClient {
         auth: Auth<'_>,
     ) -> AppResult<Response> {
         let mut attempt = 0;
+        let mut challenge_retries = 0;
+        let mut challenge_data: Option<Challenge> = None;
         loop {
             attempt += 1;
             let session = || {
@@ -279,6 +327,17 @@ impl RobloxClient {
             if let Some(token) = csrf {
                 request = request.header(CSRF_HEADER, token);
             }
+            if let Some(c) = &challenge_data {
+                request = request
+                    .header(CHALLENGE_TYPE_HEADER, c.kind.as_str())
+                    .header(CHALLENGE_ID_HEADER, c.id.as_str())
+                    .header(CHALLENGE_METADATA_HEADER, c.metadata.as_str());
+            }
+            let sent_headers: Vec<(String, String)> = request
+                .try_clone()
+                .and_then(|r| r.build().ok())
+                .map(|r| r.headers().iter().filter_map(|(k, v)| Some((k.as_str().to_owned(), v.to_str().ok()?.to_owned()))).collect())
+                .unwrap_or_default();
             if let Some(bytes) = &body {
                 // `Bytes` clones are reference-counted: replays don't copy the body.
                 request = request
@@ -287,6 +346,30 @@ impl RobloxClient {
             }
 
             let response = request.send().await?;
+            if response.headers().get(CSRF_HEADER).is_none() {
+                if let Some(challenge) = parse_challenge(&response) {
+                    let handler = self.challenge_handler.read().clone();
+                    if let (Some(handler), true) = (handler, challenge_retries < MAX_CHALLENGE_RETRIES) {
+                        let replay = ReplayRequest {
+                            url: url.to_owned(),
+                            method: method.as_str().to_owned(),
+                            headers: sent_headers,
+                            body: body.as_ref().map(|b| String::from_utf8_lossy(b).into_owned()),
+                            replay_supported: body.as_ref().is_none_or(|b| std::str::from_utf8(b).is_ok()),
+                        };
+                        match handler(challenge, replay).await {
+                            Some(ChallengeOutcome::Retry(data)) => {
+                                challenge_retries += 1;
+                                challenge_data = Some(data);
+                                attempt -= 1;
+                                continue;
+                            }
+                            Some(ChallengeOutcome::Respond(replayed)) => return Ok(replayed),
+                            None => return Ok(response),
+                        }
+                    }
+                }
+            }
             match response.status() {
                 StatusCode::FORBIDDEN if attempt < MAX_ATTEMPTS => {
                     let Some(token) = response.headers().get(CSRF_HEADER).cloned() else {
@@ -301,4 +384,10 @@ impl RobloxClient {
             }
         }
     }
+}
+
+/// `parseChallengeHeaders`: all three headers or none.
+fn parse_challenge(response: &Response) -> Option<Challenge> {
+    let get = |name: &str| response.headers().get(name).and_then(|v| v.to_str().ok()).filter(|v| !v.is_empty()).map(str::to_owned);
+    Some(Challenge { kind: get(CHALLENGE_TYPE_HEADER)?, id: get(CHALLENGE_ID_HEADER)?, metadata: get(CHALLENGE_METADATA_HEADER)? })
 }

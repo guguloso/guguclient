@@ -65,6 +65,8 @@ pub struct AppState {
     pub discord: crate::services::discord_rpc::DiscordRpc,
     pub launcher_notifications: crate::services::launcher_notifications::NotificationsState,
     pub hotkey: crate::services::mission_control::HotkeyState,
+    pub login: crate::services::login::LoginState,
+    pub challenge: crate::services::challenge::ChallengeState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -120,6 +122,8 @@ impl AppState {
             discord: Default::default(),
             launcher_notifications: Default::default(),
             hotkey: Default::default(),
+            login: Default::default(),
+            challenge: Default::default(),
             game_communities: Default::default(),
             app,
             events,
@@ -146,6 +150,7 @@ impl AppState {
     /// exactly like `userAgreementsService.initialize()` before
     /// `await authService.initialize()`.
     pub fn start_background(self: &Arc<Self>) {
+        crate::services::challenge::install(self);
         crate::services::user_settings::UserSettingsService::initialize(self);
         crate::services::agreements::UserAgreementsService::initialize(self);
         let state = Arc::clone(self);

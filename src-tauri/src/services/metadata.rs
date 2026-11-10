@@ -87,6 +87,25 @@ impl LunarApi {
     }
 }
 
+impl LunarApi {
+    /// The API origin (dev or prod).
+    pub fn base_url() -> &'static str {
+        if USE_DEV_SERVICES.load(std::sync::atomic::Ordering::Relaxed) { DEV_API_URL } else { PROD_API_URL }
+    }
+
+    /// JSON POST (`authenticateWithRobloxOAuth`).
+    pub async fn post(&self, path: &str, query: &[(&str, &str)], body: &Value) -> AppResult<()> {
+        let url = format!("{}{path}", Self::base_url());
+        let response = self.http.post(&url).query(query).json(body).send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            tracing::error!("[LunarApi] POST {path} failed: {status}");
+            return Err(AppError::Api { status: status.as_u16(), url, message: status.to_string() });
+        }
+        Ok(())
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct MetadataResponse {

@@ -37,6 +37,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 bytes = "1"
 urlencoding = "2"
 regex = "1"
+num-bigint = "0.4"
+http = "1"
 
 # Errors and logging
 thiserror = "2"

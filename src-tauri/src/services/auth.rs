@@ -344,6 +344,15 @@ impl AuthService {
     }
 
     /// `persistCookieForUser`: stores a rotated `.ROBLOSECURITY`.
+    /// `robloxApiClient.setAuthCookie` with a rotated session cookie (captcha
+    /// popups): becomes the active session and is persisted.
+    pub fn adopt_session_cookie(&self, cookie: &str) {
+        self.roblox.set_cookie(Some(cookie));
+        if let Some(user_id) = self.current_user_id() {
+            self.persist_cookie(user_id, cookie);
+        }
+    }
+
     fn persist_cookie(&self, user_id: u64, cookie: &str) {
         if self.cookie_for(user_id).as_deref() == Some(cookie) {
             return;
@@ -523,6 +532,46 @@ impl AuthService {
                 Ok(None)
             }
         }
+    }
+
+    /// `resolveLoginFromSession` + `persistAuthenticatedLogin`: the login
+    /// window's cookie becomes the active account. `None` while the cookie is
+    /// not (yet) valid; transient failures also wait for the next poll.
+    pub async fn persist_login(&self, cookie: &str, tracker_cookie: Option<&str>) -> AppResult<Option<Value>> {
+        let validated = match self.validate_cookie(cookie).await {
+            Ok(Some(v)) => v,
+            Ok(None) => return Ok(None),
+            Err(error) => {
+                tracing::warn!(%error, "Auth: Transient validation failure during login poll");
+                return Ok(None);
+            }
+        };
+        let user_id = validated.id();
+        let encrypted = self.crypto.encrypt_base64(cookie)?;
+        let mut extra = Map::new();
+        let tracker = tracker_cookie.and_then(|t| browser_tracker_from_set_cookie(&format!("RBXEventTrackerV2={t}")));
+        if let Some(tracker) = tracker {
+            extra.insert(BROWSER_TRACKER_FIELD.to_owned(), Value::String(self.crypto.encrypt_base64(&tracker)?));
+        }
+        let account = StoredAccount {
+            user_id,
+            username: validated.str_field("name"),
+            display_name: validated.str_field("displayName"),
+            cookie: encrypted,
+            session_invalid: None,
+            user_above13: None,
+            is_premium: None,
+            has_roblox_subscription: None,
+            extra,
+        };
+        self.save(|data| {
+            data.accounts.retain(|a| a.user_id != user_id);
+            data.accounts.push(account);
+            data.active_user_id = Some(user_id);
+        })?;
+        self.roblox.set_cookie(Some(cookie));
+        self.notify_active_account_changed(Some(user_id));
+        Ok(Some(Value::Object(validated.user)))
     }
 
     async fn set_cookie(&self, raw: &str) -> AppResult<Value> {
