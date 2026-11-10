@@ -1,28 +1,90 @@
-# Gugu Client for Roblox
+<h1 align="center">
+    Gugu Client
+</h1>
 
-Custom Roblox launcher & client built with Electron, featuring Discord Rich Presence integration and automatic GitHub Releases updates.
+<p align="center">
+    A custom Roblox launcher &amp; client, focused on clean aesthetics, performance, and customization.
+</p>
 
-## Estrutura do Projeto
+<p align="center">
+    <img src="./.resources/logo.png" height="200" alt="Gugu Client logo"/>
+</p>
 
-- `temp_fix/` — Código-fonte principal e recursos do launcher (`main`, `preload`, `renderer`, `resources`).
-- `build/` — Scripts de build portáteis e geração de ícones (`repack_and_build.ps1`, `build-portable.ps1`, `PortableLauncher.cs`).
+<p align="center">
+    If you'd like to support this project, consider giving this repository a star!
+</p>
 
-## Como compilar uma nova versão (ex: 1.0.17)
+<div align="center">
 
-1. Execute o script de build passando o número da nova versão:
+[![Downloads (Total)][badge-repo-downloads-total]][repo-releases]
+[![Downloads (Latest)][badge-repo-downloads]][repo-releases]
+[![Version][badge-repo-latest]][repo-latest]
+[![Stars][badge-repo-stars]][repo-stargazer]
+
+</div>
+
+> [!CAUTION]
+> The official repository [guguloso/guguclient](https://github.com/guguloso/guguclient) is the **ONLY PLACE** where you should download the official Gugu Client binary/executable. Any other source is **NOT** affiliated with us and may pose a security risk.
+
+---
+
+## Features
+
+### Integrations &amp; Discord RPC
+- Custom **Gugu For Roblox** Discord Rich Presence showing launcher status and active game details
+- Automatic game metadata resolution (experience name, creator, session timer, and quick game link)
+- Full **Bloxstrap RPC** support for rich in-game status updates
+- Native `roblox://` protocol handler integration
+
+### Performance, FastFlags &amp; Mods
+- Built-in FastFlag editor and presets for FPS, graphics, and client performance tuning
+- Custom mods, cursor, sound, and asset management per instance
+- Multiple Roblox versions &amp; channel switching support
+- Built-in Macros &amp; Roblox Studio launcher support
+
+### UI &amp; Customization
+- Sleek dark-themed interface branded with Gugu Client identity across launcher, taskbar, tray, and title bar
+- Custom Gugu Client logo dynamically styled to match interface themes and watermarks
+- Portable self-contained Windows executable — zero manual setup required
+
+### Multi-Instance &amp; Accounts
+- Built-in Roblox account switcher &amp; session manager
+- Multi-instance launching support
+- Integrated **Check for Updates** powered directly by GitHub Releases
+
+---
+
+## Auto-Updater &amp; Releases
+
+Gugu Client checks for updates automatically using this repository's **GitHub Releases**:
+
+1. Build a new portable release:
    ```powershell
    .\build\repack_and_build.ps1 -Version 1.0.17
    ```
-2. O executável atualizado será gerado na raiz como:
-   `GuguClientForRoblox-Portable-1.0.17.exe`
+2. Go to **Releases** &rarr; **Draft a new release**, set tag `v1.0.17`, and attach `GuguClientForRoblox-Portable-1.0.17.exe`.
+3. Publish the release — clicking **Check for Updates** in the client will automatically download and apply the new version.
 
-## Como publicar uma atualização (Auto-Updater)
+---
 
-O botão **Check for Updates** do launcher verifica automaticamente a última release publicada neste repositório (`guguloso/guguclient`).
+## Stargazing
 
-1. Vá na aba **Releases** do repositório e clique em **Draft a new release**.
-2. Crie uma tag com a nova versão (exemplo: `v1.0.17`).
-3. Anexe o arquivo **`GuguClientForRoblox-Portable-1.0.17.exe`** gerado pelo script.
-4. Clique em **Publish release**.
+To support the development of Gugu Client, consider giving the repository a star.
 
-Todos os usuários em versões anteriores receberão e instalarão a atualização automaticamente ao clicar em **Check for Updates** ou ao abrir o launcher!
+<a href="https://www.star-history.com/?repos=guguloso%2Fguguclient&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=guguloso/guguclient&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=guguloso/guguclient&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=guguloso/guguclient&type=date&legend=top-left" />
+ </picture>
+</a>
+
+<!-- Badge defs -->
+[badge-repo-downloads]: https://img.shields.io/github/downloads/guguloso/guguclient/latest/total?style=for-the-badge&color=18181b&labelColor=27272a
+[badge-repo-downloads-total]: https://img.shields.io/github/downloads/guguloso/guguclient/total?style=for-the-badge&color=18181b&labelColor=27272a
+[badge-repo-latest]: https://img.shields.io/github/v/release/guguloso/guguclient?style=for-the-badge&color=ffffff&labelColor=18181b
+[badge-repo-stars]: https://img.shields.io/github/stars/guguloso/guguclient?style=for-the-badge&color=18181b&labelColor=27272a
+
+[repo-releases]: https://github.com/guguloso/guguclient/releases
+[repo-latest]: https://github.com/guguloso/guguclient/releases/latest
+[repo-stargazer]: https://github.com/guguloso/guguclient/stargazers
