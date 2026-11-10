@@ -99,6 +99,11 @@ impl RobloxClient {
         Self::decode(url, response).await
     }
 
+    /// GET with the session cookie, returning the raw response (status-aware callers).
+    pub async fn get_raw(&self, url: &str) -> AppResult<Response> {
+        self.send(Method::GET, url, None, Auth::Session).await
+    }
+
     /// Like [`get`](Self::get) but authenticates with an explicit cookie
     /// (account validation, multi-account operations).
     pub async fn get_as(&self, url: &str, cookie: &str) -> AppResult<Response> {

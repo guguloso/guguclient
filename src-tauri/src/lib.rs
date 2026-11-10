@@ -115,6 +115,7 @@ pub(crate) fn show_updater_window(app: &AppHandle) -> tauri::Result<()> {
 fn update_backgrounded(window: &WebviewWindow, state: &AppState) {
     let stashed = window.is_minimized().unwrap_or(false) || !window.is_visible().unwrap_or(true);
     state.social.set_backgrounded(stashed);
+    state.chat.set_backgrounded(stashed);
 }
 
 fn init_logging(paths: &LauncherPaths) -> Option<WorkerGuard> {

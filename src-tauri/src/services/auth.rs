@@ -155,6 +155,38 @@ impl AuthService {
         data.accounts.iter().any(|a| a.user_id == user_id && a.user_above13 == Some(true))
     }
 
+    /// `updateStoredAccountFlags`: merges age/premium flags, writing and
+    /// notifying (`auth:accountsChanged`) only when something changed.
+    pub fn update_stored_account_flags(
+        &self,
+        user_id: u64,
+        user_above13: Option<bool>,
+        is_premium: Option<bool>,
+        has_roblox_subscription: Option<bool>,
+    ) {
+        let changed = {
+            let data = self.data.read();
+            let Some(account) = data.accounts.iter().find(|a| a.user_id == user_id) else { return };
+            user_above13.or(account.user_above13) != account.user_above13
+                || is_premium.or(account.is_premium) != account.is_premium
+                || has_roblox_subscription.or(account.has_roblox_subscription) != account.has_roblox_subscription
+        };
+        if !changed {
+            return;
+        }
+        let result = self.save(|data| {
+            if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
+                account.user_above13 = user_above13.or(account.user_above13);
+                account.is_premium = is_premium.or(account.is_premium);
+                account.has_roblox_subscription = has_roblox_subscription.or(account.has_roblox_subscription);
+            }
+        });
+        match result {
+            Ok(()) => self.events.emit_main("auth:accountsChanged", Value::Null),
+            Err(error) => tracing::warn!(%error, "Auth: failed to persist account flags"),
+        }
+    }
+
     /// `fetchApiWithWebContext` credentials: the active cookie and its
     /// browser tracker id, provisioned from `roblox.com/home` when missing.
     pub async fn web_context(&self) -> Option<(String, String)> {

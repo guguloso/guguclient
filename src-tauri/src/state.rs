@@ -43,6 +43,10 @@ pub struct AppState {
     pub metadata: MetadataService,
     pub updater: UpdaterService,
     pub agreements: UserAgreementsService,
+    pub game_lists: crate::services::game_lists::GameListsState,
+    pub catalog: crate::services::catalog::CatalogState,
+    pub chat: crate::services::chat::ChatPoller,
+    pub user_settings: crate::services::user_settings::UserSettingsService,
 }
 
 impl AppState {
@@ -67,6 +71,10 @@ impl AppState {
             metadata: MetadataService::new()?,
             updater: UpdaterService::new(),
             agreements: UserAgreementsService::default(),
+            game_lists: Default::default(),
+            catalog: Default::default(),
+            chat: crate::services::chat::ChatPoller::new(),
+            user_settings: Default::default(),
             app,
             events,
             roblox,
@@ -86,12 +94,14 @@ impl AppState {
     /// exactly like `userAgreementsService.initialize()` before
     /// `await authService.initialize()`.
     pub fn start_background(self: &Arc<Self>) {
+        crate::services::user_settings::UserSettingsService::initialize(self);
         crate::services::agreements::UserAgreementsService::initialize(self);
         let state = Arc::clone(self);
         tauri::async_runtime::spawn(async move {
             state.auth.initialize().await;
             crate::services::updater::UpdaterService::initialize(&state);
             crate::services::metadata::MetadataService::initialize(&state);
+            crate::services::chat::ChatPoller::start(&state);
             crate::services::social::SocialService::start(&state);
         });
     }
