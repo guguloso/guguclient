@@ -56,6 +56,7 @@ pub struct AppState {
     pub feeds: crate::services::feeds::FeedsState,
     pub forums: crate::services::forums::ForumsState,
     pub private_servers: crate::services::private_servers::PrivateServersState,
+    pub avatar: crate::services::avatar::AvatarState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -102,6 +103,7 @@ impl AppState {
             feeds: Default::default(),
             forums: Default::default(),
             private_servers: Default::default(),
+            avatar: Default::default(),
             game_communities: Default::default(),
             app,
             events,

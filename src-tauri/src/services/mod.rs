@@ -8,6 +8,7 @@ pub mod agreements;
 pub mod analytics;
 pub mod app;
 pub mod auth;
+pub mod avatar;
 pub mod cache;
 pub mod catalog;
 pub mod chat;
@@ -71,6 +72,7 @@ pub fn register_all(router: &mut Router) {
     forums::register(router);
     trades::register(router);
     private_servers::register(router);
+    avatar::register(router);
     thumbnails::register(router);
     social::register(router);
     feature_flags::register(router);

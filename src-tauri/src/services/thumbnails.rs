@@ -287,6 +287,16 @@ impl ThumbnailService {
         Ok(responses)
     }
 
+    /// `deleteFramedTarget`: drops cached framed headshots of one target.
+    pub fn delete_framed_target(&self, kind: &str, id: u64) {
+        let prefix = format!("{kind}:{id}:");
+        let mut cache = self.ids.lock();
+        let stale: Vec<String> = cache.iter().filter(|(k, _)| k.starts_with(&prefix) && k.ends_with(":frame")).map(|(k, _)| k.clone()).collect();
+        for key in stale {
+            cache.pop(&key);
+        }
+    }
+
     /// `getSingleWithRetry`: one request, polled while Roblox renders it.
     pub async fn get_single_with_retry(
         &self,
