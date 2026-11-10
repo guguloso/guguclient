@@ -50,6 +50,9 @@ pub struct AppState {
     pub instances: crate::services::instances::InstancesService,
     pub versions: crate::services::versions::VersionsService,
     pub launch: crate::services::launch::LaunchService,
+    pub misc: crate::services::app::AppMisc,
+    pub protocol: crate::services::protocol::ProtocolService,
+    pub game_preferences: crate::services::preferences::GamePreferences,
 }
 
 impl AppState {
@@ -81,6 +84,9 @@ impl AppState {
             instances: Default::default(),
             versions: Default::default(),
             launch: Default::default(),
+            misc: Default::default(),
+            protocol: Default::default(),
+            game_preferences: crate::services::preferences::GamePreferences::open(&paths)?,
             app,
             events,
             roblox,
@@ -109,6 +115,12 @@ impl AppState {
             crate::services::metadata::MetadataService::initialize(&state);
             crate::services::chat::ChatPoller::start(&state);
             crate::services::social::SocialService::start(&state);
+            crate::services::protocol::sync_handlers(&state).await;
+            let argv: Vec<String> = std::env::args().collect();
+            if let Some(url) = crate::services::protocol::extract_protocol_url(&argv) {
+                tracing::info!("Processing queued protocol URL");
+                crate::services::protocol::handle_url(&state, &url, "process_args").await;
+            }
         });
     }
 }

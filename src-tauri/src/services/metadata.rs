@@ -450,3 +450,8 @@ pub fn register(router: &mut Router) {
             Ok(fetch_metadata(&ctx.state, Some(&stream)).await.unwrap_or(stream))
         });
 }
+
+/// `InstallationIdService.getInstallationId` for `app:getInstallationId`.
+pub fn installation_id_value(base: &Path) -> String {
+    installation_id(base).to_owned()
+}

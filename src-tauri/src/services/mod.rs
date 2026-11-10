@@ -5,6 +5,7 @@
 //! `src-tauri/scripts/prepare-frontend.mjs` on every dev/build run).
 
 pub mod agreements;
+pub mod app;
 pub mod analytics;
 pub mod auth;
 pub mod cache;
@@ -16,13 +17,18 @@ pub mod friends;
 pub mod game_lists;
 pub mod games;
 pub mod instances;
+pub mod inventory;
 pub mod launch;
 pub mod metadata;
 pub mod poller;
+pub mod preferences;
+pub mod protocol;
+pub mod registry;
 pub mod roblox_layout;
 pub mod settings;
 pub mod social;
 pub mod thumbnails;
+pub mod trade_links;
 pub mod updater;
 pub mod user_settings;
 pub mod users;
@@ -48,6 +54,11 @@ pub fn register_all(router: &mut Router) {
     versions::register(router);
     launch::register(router);
     launch::register_running(router);
+    app::register(router);
+    protocol::register(router);
+    inventory::register(router);
+    trade_links::register(router);
+    preferences::register(router);
     thumbnails::register(router);
     social::register(router);
     feature_flags::register(router);

@@ -335,6 +335,11 @@ async fn search_items(ctx: &Ctx, q: SearchQuery) -> AppResult<Value> {
 
 /// `lookupItemsDetails` through the 5-minute item details cache.
 async fn items_details(state: &AppState, items: &[ItemRef], strict: bool) -> AppResult<Vec<Value>> {
+    Ok(raw_items_details(state, items, strict).await?.iter().map(to_catalog_item).collect())
+}
+
+/// `itemDetailsCache.batchFetch` + `postCatalogItemsDetails`: raw entries.
+pub async fn raw_items_details(state: &AppState, items: &[ItemRef], strict: bool) -> AppResult<Vec<Value>> {
     if items.is_empty() {
         return Ok(Vec::new());
     }
@@ -381,7 +386,7 @@ async fn items_details(state: &AppState, items: &[ItemRef], strict: bool) -> App
             Err(error) => tracing::warn!(%error, "Failed to fetch catalog item details batch"),
         }
     }
-    Ok(result.iter().map(|(_, raw)| to_catalog_item(raw)).collect())
+    Ok(result.into_iter().map(|(_, raw)| raw).collect())
 }
 
 enum Lookup {

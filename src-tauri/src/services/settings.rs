@@ -62,6 +62,11 @@ impl SettingsService {
         }))
     }
 
+    /// `STATIC_SETTING_DEFAULTS[id]`.
+    pub fn default_value(&self, id: &str) -> Option<Value> {
+        self.defaults.get(id).cloned()
+    }
+
     pub fn get_bool(&self, id: &str) -> bool {
         self.get(id).and_then(|v| v.as_bool()).unwrap_or(false)
     }

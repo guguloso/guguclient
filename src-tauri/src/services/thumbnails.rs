@@ -283,6 +283,47 @@ impl ThumbnailService {
         Ok(responses)
     }
 
+    /// `getSingleWithRetry`: one request, polled while Roblox renders it.
+    pub async fn get_single_with_retry(&self, request: ThumbnailRequest, max_retries: u32, retry_delay_ms: u64) -> AppResult<Value> {
+        let key = request.cache_key();
+        if let Some(key) = &key {
+            let mut cache = self.urls.lock();
+            if request.version.is_some() {
+                cache.pop(key);
+            } else if let Some(url) = cache.get(key) {
+                return Ok(json!({
+                    "requestId": request.request_id,
+                    "targetId": request.target_id,
+                    "state": "Completed",
+                    "imageUrl": url,
+                }));
+            }
+        }
+        let url = format!("{}/batch", endpoints::THUMBNAILS_V1);
+        let body = [request.to_api(request.request_id.clone().unwrap_or_default())];
+        let mut retries = 0;
+        loop {
+            let mut page: Value = self.roblox.post(&url, &body).await?;
+            let Some(Value::Object(mut entry)) = page.get_mut("data").and_then(|d| d.get_mut(0)).map(Value::take) else {
+                return Ok(Value::Null);
+            };
+            let state = entry.get("state").and_then(Value::as_str).unwrap_or("").to_owned();
+            if state == "Pending" && retries < max_retries {
+                retries += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(retry_delay_ms)).await;
+                continue;
+            }
+            if let Some(Value::String(remote)) = entry.get("imageUrl") {
+                let local = to_local_url(remote);
+                if let (true, Some(key)) = (state == "Completed", &key) {
+                    self.urls.lock().put(key.clone(), local.clone());
+                }
+                entry.insert("imageUrl".into(), Value::String(local));
+            }
+            return Ok(Value::Object(entry));
+        }
+    }
+
     /// Serves `http://lbx-thumb.localhost/?src=<url>` from disk, fetching once.
     async fn serve(&self, uri: &str) -> Response<Vec<u8>> {
         let Some(source) = uri
@@ -399,6 +440,12 @@ pub fn register(router: &mut Router) {
     router.handle("thumbnails:getBatch", |ctx, args| async move {
         let requests: Vec<ThumbnailRequest> = args.get(0)?;
         ctx.state.thumbnails.get_batch(requests).await
+    })
+    .handle("thumbnails:getSingleWithRetry", |ctx, args| async move {
+        let request: ThumbnailRequest = args.get(0)?;
+        let max_retries: Option<u32> = args.opt(1)?;
+        let delay: Option<u64> = args.opt(2)?;
+        ctx.state.thumbnails.get_single_with_retry(request, max_retries.unwrap_or(5), delay.unwrap_or(1000)).await
     });
 }
 

@@ -432,7 +432,7 @@ pub fn mark_stopped(state: &AppState, id: &str) {
 }
 
 /// Parses `YYYY-MM-DDTHH:MM:SS(.mmm)Z` to Unix milliseconds.
-fn parse_iso_millis(s: &str) -> Option<u64> {
+pub fn parse_iso_millis(s: &str) -> Option<u64> {
     let (date, time) = s.trim_end_matches('Z').split_once('T')?;
     let mut d = date.split('-').map(|p| p.parse::<i64>());
     let (y, m, day) = (d.next()?.ok()?, d.next()?.ok()?, d.next()?.ok()?);

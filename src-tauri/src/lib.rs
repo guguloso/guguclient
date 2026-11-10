@@ -44,7 +44,8 @@ pub fn run() {
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "Application starting (Rust runtime)");
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| reveal_main_window(app)))
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| on_second_instance(app, argv)))
+        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol(services::thumbnails::PROTOCOL, services::thumbnails::protocol_handler)
         .invoke_handler(tauri::generate_handler![ipc::ipc_invoke])
         .setup(move |app| {
@@ -240,4 +241,20 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     }
     tray.build(app)?;
     Ok(())
+}
+
+/// `second-instance`: forward a protocol URL from the new process, or just
+/// bring the window back.
+fn on_second_instance(app: &AppHandle, argv: Vec<String>) {
+    match services::protocol::extract_protocol_url(&argv) {
+        Some(url) => {
+            if let Some(state) = app.try_state::<Arc<AppState>>() {
+                let state = Arc::clone(&state);
+                tauri::async_runtime::spawn(async move {
+                    services::protocol::handle_url(&state, &url, "second_instance").await;
+                });
+            }
+        }
+        None => reveal_main_window(app),
+    }
 }

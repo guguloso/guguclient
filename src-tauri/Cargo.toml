@@ -18,6 +18,7 @@ tauri-build = { version = "2", features = [] }
 # Runtime / UI shell: the existing React renderer runs unchanged in WebView2.
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
+tauri-plugin-notification = "2"
 
 # Serialization: the IPC contract is JSON, identical to Electron's.
 serde = { version = "1", features = ["derive", "rc"] }
