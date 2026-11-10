@@ -321,7 +321,7 @@ async fn fetch_discovery(ctx: &Ctx) -> AppResult<Value> {
 async fn friend_items(ctx: &Ctx) -> Vec<Value> {
     let Ok(Some(user)) = ctx.state.auth.authenticated_user().await else { return Vec::new() };
     let Some(me) = user.get("id").and_then(Value::as_u64) else { return Vec::new() };
-    let friends = friends::list_friends(ctx, me).await;
+    let friends = friends::list_friends(&ctx.state, me).await;
     if friends.is_empty() {
         return Vec::new();
     }

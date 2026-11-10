@@ -23,6 +23,13 @@ impl EventBus {
         Self { app }
     }
 
+    /// Main-window-only push (`getMainWindow()?.webContents.send`).
+    pub fn emit_main<T: Serialize + Clone>(&self, channel: &str, payload: T) {
+        if let Err(error) = self.app.emit_to(crate::MAIN_WINDOW, BRIDGE_EVENT, Envelope { channel, payload }) {
+            tracing::warn!(channel, %error, "failed to emit ipc event");
+        }
+    }
+
     pub fn emit<T: Serialize + Clone>(&self, channel: &str, payload: T) {
         if let Err(error) = self.app.emit(BRIDGE_EVENT, Envelope { channel, payload }) {
             tracing::warn!(channel, %error, "failed to emit ipc event");

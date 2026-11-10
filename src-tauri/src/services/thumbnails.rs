@@ -334,6 +334,26 @@ pub fn to_local_url(remote: &str) -> String {
     format!("{LOCAL_PREFIX}{}", urlencoding::encode(remote))
 }
 
+/// Electron's on-disk form of a proxied thumbnail (`lbx-thumb://image/?src=`).
+const ELECTRON_PREFIX: &str = "lbx-thumb://image/?src=";
+
+/// Persisted URL → URL the WebView can load (Electron caches use the
+/// `lbx-thumb://` scheme, which WebView2 cannot resolve).
+pub fn from_persisted_url(url: &str) -> String {
+    match url.strip_prefix(ELECTRON_PREFIX) {
+        Some(encoded) => format!("{LOCAL_PREFIX}{encoded}"),
+        None => url.to_owned(),
+    }
+}
+
+/// Local URL → Electron's persisted form, so both builds share caches.
+pub fn to_persisted_url(url: &str) -> String {
+    match url.strip_prefix(LOCAL_PREFIX) {
+        Some(encoded) => format!("{ELECTRON_PREFIX}{encoded}"),
+        None => url.to_owned(),
+    }
+}
+
 fn is_allowed_source(url: &str) -> bool {
     url.strip_prefix("https://")
         .and_then(|rest| rest.split('/').next())
@@ -390,6 +410,10 @@ mod tests {
     fn local_urls_only_for_roblox_cdn() {
         assert!(to_local_url("https://tr.rbxcdn.com/abc/150/150/Image/Png").starts_with(LOCAL_PREFIX));
         assert_eq!(to_local_url("https://evil.example/x.png"), "https://evil.example/x.png");
+        let local = to_local_url("https://tr.rbxcdn.com/abc/150/150/Image/Png");
+        let persisted = to_persisted_url(&local);
+        assert!(persisted.starts_with("lbx-thumb://image/?src="));
+        assert_eq!(from_persisted_url(&persisted), local);
         assert_eq!(sniff_content_type(&[0x89, b'P', b'N', b'G']), "image/png");
     }
 }

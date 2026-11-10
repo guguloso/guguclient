@@ -9,6 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
+use crate::roblox::endpoints;
 
 const USER_AGENT: &str = concat!(
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ",
@@ -17,7 +18,19 @@ const USER_AGENT: &str = concat!(
 );
 const CSRF_HEADER: &str = "x-csrf-token";
 const MAX_ATTEMPTS: u32 = 4;
+const WEB_REFERER: &str = "https://www.roblox.com/";
 const ERROR_BODY_LIMIT: usize = 300;
+
+/// Which credentials a request carries.
+#[derive(Clone, Copy)]
+enum Auth<'a> {
+    /// The active session cookie (rozod's synced cookie).
+    Session,
+    /// An explicit account cookie.
+    Cookie(&'a str),
+    /// Website context; falls back to the session cookie without a tracker.
+    Web { cookie: Option<&'a str>, tracker: Option<&'a str> },
+}
 
 /// Shared, connection-pooled Roblox client. Cheap to share via `Arc`; the
 /// cookie and CSRF token sit behind short-lived locks never held across `.await`.
@@ -51,7 +64,7 @@ impl RobloxClient {
     }
 
     pub async fn get<T: DeserializeOwned>(&self, url: &str) -> AppResult<T> {
-        let response = self.send(Method::GET, url, None, None).await?;
+        let response = self.send(Method::GET, url, None, Auth::Session).await?;
         Self::decode(url, response).await
     }
 
@@ -61,13 +74,13 @@ impl RobloxClient {
         T: DeserializeOwned,
     {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        let response = self.send(Method::POST, url, Some(bytes), None).await?;
+        let response = self.send(Method::POST, url, Some(bytes), Auth::Session).await?;
         Self::decode(url, response).await
     }
 
     /// POST without a request body (follow, unfriend, accept, ...).
     pub async fn post_empty<T: DeserializeOwned>(&self, url: &str) -> AppResult<T> {
-        let response = self.send(Method::POST, url, None, None).await?;
+        let response = self.send(Method::POST, url, None, Auth::Session).await?;
         Self::decode(url, response).await
     }
 
@@ -77,24 +90,24 @@ impl RobloxClient {
         T: DeserializeOwned,
     {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        let response = self.send(Method::PATCH, url, Some(bytes), None).await?;
+        let response = self.send(Method::PATCH, url, Some(bytes), Auth::Session).await?;
         Self::decode(url, response).await
     }
 
     pub async fn delete<T: DeserializeOwned>(&self, url: &str) -> AppResult<T> {
-        let response = self.send(Method::DELETE, url, None, None).await?;
+        let response = self.send(Method::DELETE, url, None, Auth::Session).await?;
         Self::decode(url, response).await
     }
 
     /// Like [`get`](Self::get) but authenticates with an explicit cookie
     /// (account validation, multi-account operations).
     pub async fn get_as(&self, url: &str, cookie: &str) -> AppResult<Response> {
-        self.send(Method::GET, url, None, Some(cookie)).await
+        self.send(Method::GET, url, None, Auth::Cookie(cookie)).await
     }
 
     pub async fn post_as<B: Serialize + ?Sized>(&self, url: &str, body: &B, cookie: &str) -> AppResult<Response> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        self.send(Method::POST, url, Some(bytes), Some(cookie)).await
+        self.send(Method::POST, url, Some(bytes), Auth::Cookie(cookie)).await
     }
 
     pub async fn decode<T: DeserializeOwned>(url: &str, response: Response) -> AppResult<T> {
@@ -115,23 +128,47 @@ impl RobloxClient {
     /// Sends with Roblox's protocol quirks handled:
     /// - 403 + `x-csrf-token` header: store the token and replay once
     /// - 429: exponential backoff (400ms, 800ms, 1.6s)
-    async fn send(
+    /// `fetchApiWithWebContext`: a call that carries the Roblox website
+    /// context (Origin/Referer and, when known, the browser tracker cookie).
+    pub async fn request_web<T: DeserializeOwned>(
         &self,
         method: Method,
         url: &str,
-        body: Option<Bytes>,
-        cookie_override: Option<&str>,
-    ) -> AppResult<Response> {
+        body: Option<&serde_json::Value>,
+        context: Option<(&str, &str)>,
+    ) -> AppResult<T> {
+        let bytes = body.map(serde_json::to_vec).transpose()?.map(Bytes::from);
+        let auth = match context {
+            Some((cookie, tracker)) => Auth::Web { cookie: Some(cookie), tracker: Some(tracker) },
+            None => Auth::Web { cookie: None, tracker: None },
+        };
+        let response = self.send(method, url, bytes, auth).await?;
+        Self::decode(url, response).await
+    }
+
+    async fn send(&self, method: Method, url: &str, body: Option<Bytes>, auth: Auth<'_>) -> AppResult<Response> {
         let mut attempt = 0;
         loop {
             attempt += 1;
-            let cookie_header = match cookie_override {
-                Some(cookie) => Some(format!(".ROBLOSECURITY={cookie}")),
-                None => self.cookie.read().as_deref().map(|c| format!(".ROBLOSECURITY={c}")),
+            let session = || self.cookie.read().as_deref().map(|c| format!(".ROBLOSECURITY={c}"));
+            let cookie_header = match auth {
+                Auth::Session => session(),
+                Auth::Cookie(cookie) => Some(format!(".ROBLOSECURITY={cookie}")),
+                Auth::Web { cookie: Some(cookie), tracker: Some(tracker) } => Some(format!(
+                    ".ROBLOSECURITY={cookie}; RBXEventTrackerV2=browserid={}",
+                    urlencoding::encode(tracker)
+                )),
+                Auth::Web { .. } => session(),
             };
             let csrf = if method == Method::GET { None } else { self.csrf.read().clone() };
 
             let mut request = self.http.request(method.clone(), url);
+            if let Auth::Web { tracker, .. } = auth {
+                request = request.header("Origin", endpoints::WEB).header("Referer", WEB_REFERER);
+                if let (Some(tracker), true) = (tracker, matches!(auth, Auth::Web { cookie: Some(_), .. })) {
+                    request = request.header("Roblox-Browser-Tracker", tracker);
+                }
+            }
             if let Some(header) = cookie_header {
                 request = request.header(COOKIE, header);
             }

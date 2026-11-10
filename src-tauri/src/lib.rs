@@ -32,7 +32,8 @@ use crate::state::AppState;
 
 /// `window.api` bridge generated from the Electron preload.
 const BRIDGE_JS: &str = include_str!("../generated/bridge.js");
-const MAIN_WINDOW: &str = "main";
+pub(crate) const MAIN_WINDOW: &str = "main";
+pub(crate) const UPDATER_WINDOW: &str = "updater";
 const MIN_WIDTH: f64 = 1120.0;
 const MIN_HEIGHT: f64 = 760.0;
 const MAXIMIZED_CHANGED: &str = "window:maximizedChanged";
@@ -53,12 +54,67 @@ pub fn run() {
             app.manage(Arc::clone(&state));
             app.manage(router);
 
+            state.start_background();
             build_tray(app.handle())?;
             create_main_window(app.handle(), &state)?;
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Gugu Client");
+        .build(tauri::generate_context!())
+        .expect("error while building Gugu Client")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // `before-quit`: persist debounced caches.
+                if let Some(state) = app.try_state::<Arc<AppState>>() {
+                    state.social.stop();
+                }
+            }
+        });
+}
+
+/// Builds a frameless app window running the renderer with the bridge.
+/// `route` is the initial hash route (Electron's `loadFile({ hash })`).
+fn app_window_builder<'a>(app: &'a AppHandle, label: &'a str, route: Option<&str>) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    let mut script = String::with_capacity(BRIDGE_JS.len() + 128);
+    if let Some(route) = route {
+        script.push_str(&format!("if(!location.hash)history.replaceState(null,'','#{route}');\n"));
+    }
+    script.push_str(BRIDGE_JS);
+    WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        .decorations(false)
+        .visible(false)
+        .background_color(Color(5, 5, 5, 255))
+        .initialization_script(&script)
+}
+
+/// `UpdaterWindowService.showUpdaterWindow`: 560×470, fixed size, frameless.
+pub(crate) fn show_updater_window(app: &AppHandle) -> tauri::Result<()> {
+    let window = match app.get_webview_window(UPDATER_WINDOW) {
+        Some(window) => window,
+        None => {
+            let window = app_window_builder(app, UPDATER_WINDOW, Some("/updater"))
+                .title("Gugu Client for Roblox")
+                .inner_size(560.0, 470.0)
+                .resizable(false)
+                .build()?;
+            let state = app.state::<Arc<AppState>>().inner().clone();
+            window.on_window_event(move |event| {
+                if let WindowEvent::Focused(true) = event {
+                    services::updater::UpdaterService::on_window_focus(&state);
+                }
+            });
+            tracing::info!("[UpdaterWindow] Created updater window");
+            window
+        }
+    };
+    window.show()?;
+    window.set_focus()?;
+    Ok(())
+}
+
+/// `isMainWindowStashed()`: minimized or hidden (to tray).
+fn update_backgrounded(window: &WebviewWindow, state: &AppState) {
+    let stashed = window.is_minimized().unwrap_or(false) || !window.is_visible().unwrap_or(true);
+    state.social.set_backgrounded(stashed);
 }
 
 fn init_logging(paths: &LauncherPaths) -> Option<WorkerGuard> {
@@ -77,7 +133,7 @@ fn init_logging(paths: &LauncherPaths) -> Option<WorkerGuard> {
 fn create_main_window(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<()> {
     let resolution = state.settings.main_resolution();
     #[allow(unused_mut)]
-    let mut builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, WebviewUrl::App("index.html".into()));
+    let mut builder = app_window_builder(app, MAIN_WINDOW, None);
     // Debug builds only: `GUGU_DEBUG_PORT=9333` exposes the WebView2 DevTools
     // protocol for automated UI checks. Keeps Tauri's default feature flags.
     #[cfg(debug_assertions)]
@@ -90,10 +146,6 @@ fn create_main_window(app: &AppHandle, state: &Arc<AppState>) -> tauri::Result<(
         .title("Gugu Client for Roblox")
         .inner_size(resolution.width.max(MIN_WIDTH), resolution.height.max(MIN_HEIGHT))
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
-        .decorations(false)
-        .visible(false)
-        .background_color(Color(5, 5, 5, 255))
-        .initialization_script(BRIDGE_JS)
         // Show only once painted: no white flash on startup.
         .on_page_load(|window, payload| {
             if payload.event() == PageLoadEvent::Finished {
@@ -120,12 +172,18 @@ fn attach_window_events(window: &WebviewWindow, state: Arc<AppState>) {
                 state.events.emit(MAXIMIZED_CHANGED, maximized);
                 save_resolution(&handle, &state);
             }
+            update_backgrounded(&handle, &state);
+        }
+        WindowEvent::Focused(true) => {
+            update_backgrounded(&handle, &state);
+            services::updater::UpdaterService::on_window_focus(&state);
         }
         WindowEvent::CloseRequested { api, .. } => {
             save_resolution(&handle, &state);
             if state.settings.get_bool("close-to-tray") {
                 api.prevent_close();
                 let _ = handle.hide();
+                update_backgrounded(&handle, &state);
             }
         }
         _ => {}

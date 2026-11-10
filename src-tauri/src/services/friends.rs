@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use serde_json::{json, Value};
 
 use crate::error::AppResult;
-use crate::ipc::{Ctx, Router};
+use crate::ipc::Router;
+use crate::state::AppState;
 use crate::roblox::endpoints;
 
 const FRIEND_STATUSES: [&str; 4] = ["NotFriends", "Friends", "RequestSent", "RequestReceived"];
@@ -32,7 +33,7 @@ fn data_array(mut body: Value, key: &str) -> Vec<Value> {
 }
 
 /// `fetchUserDetails`: resolves usernames/display names in one call.
-async fn fetch_user_details(ctx: &Ctx, user_ids: Vec<u64>) -> HashMap<u64, Names> {
+async fn fetch_user_details(state: &AppState, user_ids: Vec<u64>) -> HashMap<u64, Names> {
     if user_ids.is_empty() {
         return HashMap::new();
     }
@@ -41,7 +42,7 @@ async fn fetch_user_details(ctx: &Ctx, user_ids: Vec<u64>) -> HashMap<u64, Names
         "userIds": user_ids,
         "fields": ["names.combinedName", "names.username", "isVerified", "isDeleted"],
     });
-    let response: Value = match ctx.state.roblox.post(&url, &body).await {
+    let response: Value = match state.roblox.post(&url, &body).await {
         Ok(response) => response,
         Err(error) => {
             tracing::warn!(%error, "Failed to fetch user details");
@@ -80,16 +81,16 @@ fn first_non_empty<'a>(options: &[&'a str]) -> &'a str {
     options.iter().copied().find(|s| !s.is_empty()).unwrap_or_default()
 }
 
-pub async fn list_friends(ctx: &Ctx, user_id: u64) -> Vec<Value> {
+pub async fn list_friends(state: &AppState, user_id: u64) -> Vec<Value> {
     let url = format!("{}/users/{user_id}/friends", endpoints::FRIENDS_V1);
-    let friends = match ctx.state.roblox.get::<Value>(&url).await {
+    let friends = match state.roblox.get::<Value>(&url).await {
         Ok(body) => data_array(body, "data"),
         Err(error) => {
             tracing::error!(user_id, %error, "Failed to get friends");
             return Vec::new();
         }
     };
-    let details = fetch_user_details(ctx, friends.iter().filter_map(needs_names).collect()).await;
+    let details = fetch_user_details(state, friends.iter().filter_map(needs_names).collect()).await;
     friends
         .iter()
         .map(|f| {
@@ -115,16 +116,16 @@ pub async fn list_friends(ctx: &Ctx, user_id: u64) -> Vec<Value> {
         .collect()
 }
 
-async fn get_online_friends(ctx: &Ctx, user_id: u64) -> Vec<Value> {
+async fn get_online_friends(state: &AppState, user_id: u64) -> Vec<Value> {
     let url = format!("{}/users/{user_id}/friends/online", endpoints::FRIENDS_V1);
-    let friends = match ctx.state.roblox.get::<Value>(&url).await {
+    let friends = match state.roblox.get::<Value>(&url).await {
         Ok(body) => data_array(body, "data"),
         Err(error) => {
             tracing::error!(user_id, %error, "Failed to get online friends");
             return Vec::new();
         }
     };
-    let details = fetch_user_details(ctx, friends.iter().filter_map(needs_names).collect()).await;
+    let details = fetch_user_details(state, friends.iter().filter_map(needs_names).collect()).await;
     friends
         .iter()
         .map(|f| {
@@ -144,9 +145,9 @@ async fn get_online_friends(ctx: &Ctx, user_id: u64) -> Vec<Value> {
         .collect()
 }
 
-async fn get_friend_requests(ctx: &Ctx) -> Vec<Value> {
+pub async fn get_friend_requests(state: &AppState) -> Vec<Value> {
     let url = format!("{}/my/friends/requests?limit=100", endpoints::FRIENDS_V1);
-    let requests = match ctx.state.roblox.get::<Value>(&url).await {
+    let requests = match state.roblox.get::<Value>(&url).await {
         Ok(body) => data_array(body, "data"),
         Err(error) => {
             tracing::error!(%error, "Failed to get friend requests");
@@ -158,8 +159,8 @@ async fn get_friend_requests(ctx: &Ctx) -> Vec<Value> {
         .filter(|r| str_of(r, "name").is_empty() && str_of(r, "displayName").is_empty())
         .filter_map(|r| u64_of(r, "id"))
         .collect();
-    let details = fetch_user_details(ctx, missing).await;
-    let now = now_iso();
+    let details = fetch_user_details(state, missing).await;
+    let now = crate::util::now_iso();
     requests
         .iter()
         .map(|r| {
@@ -187,10 +188,10 @@ async fn get_friend_requests(ctx: &Ctx) -> Vec<Value> {
         .collect()
 }
 
-async fn check_friend_status(ctx: &Ctx, user_id: u64) -> Option<String> {
-    let me = ctx.state.auth.current_user_id()?;
+async fn check_friend_status(state: &AppState, user_id: u64) -> Option<String> {
+    let me = state.auth.current_user_id()?;
     let url = format!("{}/users/{me}/friends/statuses?userIds={user_id}", endpoints::FRIENDS_V1);
-    match ctx.state.roblox.get::<Value>(&url).await {
+    match state.roblox.get::<Value>(&url).await {
         Ok(body) => body
             .pointer("/data/0/status")
             .and_then(Value::as_str)
@@ -203,9 +204,9 @@ async fn check_friend_status(ctx: &Ctx, user_id: u64) -> Option<String> {
     }
 }
 
-async fn is_following(ctx: &Ctx, user_id: u64) -> bool {
+async fn is_following(state: &AppState, user_id: u64) -> bool {
     let url = format!("{}/user/following-exists", endpoints::FRIENDS_V1);
-    match ctx.state.roblox.post::<_, Value>(&url, &json!({ "targetUserIds": [user_id] })).await {
+    match state.roblox.post::<_, Value>(&url, &json!({ "targetUserIds": [user_id] })).await {
         Ok(body) => body.pointer("/followings/0/isFollowing").and_then(Value::as_bool).unwrap_or(false),
         Err(error) => {
             tracing::error!(user_id, %error, "Failed to get following status");
@@ -214,13 +215,13 @@ async fn is_following(ctx: &Ctx, user_id: u64) -> bool {
     }
 }
 
-async fn search_friends(ctx: &Ctx, user_id: u64, query: &str, limit: u32) -> Vec<Value> {
+async fn search_friends(state: &AppState, user_id: u64, query: &str, limit: u32) -> Vec<Value> {
     let url = format!(
         "{}/users/{user_id}/friends/search?query={}&limit={limit}",
         endpoints::FRIENDS_V1,
         urlencoding::encode(query)
     );
-    let friends = match ctx.state.roblox.get::<Value>(&url).await {
+    let friends = match state.roblox.get::<Value>(&url).await {
         Ok(body) => data_array(body, "PageItems"),
         Err(error) => {
             tracing::error!(user_id, %error, "Failed to search friends");
@@ -231,7 +232,7 @@ async fn search_friends(ctx: &Ctx, user_id: u64, query: &str, limit: u32) -> Vec
     if ids.is_empty() {
         return Vec::new();
     }
-    let details = fetch_user_details(ctx, ids).await;
+    let details = fetch_user_details(state, ids).await;
     friends
         .iter()
         .map(|f| {
@@ -255,78 +256,70 @@ async fn search_friends(ctx: &Ctx, user_id: u64, query: &str, limit: u32) -> Vec
 }
 
 /// Mutations propagate errors (the UI shows a toast), like the original.
-async fn post_action(ctx: &Ctx, path: String, body: Option<Value>) -> AppResult<()> {
+async fn post_action(state: &AppState, path: String, body: Option<Value>) -> AppResult<()> {
     let url = format!("{}{path}", endpoints::FRIENDS_V1);
     match body {
-        Some(body) => ctx.state.roblox.post::<_, Value>(&url, &body).await?,
-        None => ctx.state.roblox.post_empty::<Value>(&url).await?,
+        Some(body) => state.roblox.post::<_, Value>(&url, &body).await?,
+        None => state.roblox.post_empty::<Value>(&url).await?,
     };
     tracing::info!(%path, "friends action ok");
     Ok(())
-}
-
-fn now_iso() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    crate::util::iso8601_from_unix(secs)
 }
 
 pub fn register(router: &mut Router) {
     router
         .handle("friends:getFriends", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;
-            Ok(list_friends(&ctx, user_id).await)
+            Ok(list_friends(&ctx.state, user_id).await)
         })
         .handle("friends:getOnlineFriends", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;
-            Ok(get_online_friends(&ctx, user_id).await)
+            Ok(get_online_friends(&ctx.state, user_id).await)
         })
-        .handle("friends:getFriendRequests", |ctx, _| async move { Ok(get_friend_requests(&ctx).await) })
+        .handle("friends:getFriendRequests", |ctx, _| async move { Ok(get_friend_requests(&ctx.state).await) })
         .handle("friends:acceptFriendRequest", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx, format!("/users/{id}/accept-friend-request"), None).await
+            post_action(&ctx.state, format!("/users/{id}/accept-friend-request"), None).await
         })
         .handle("friends:declineFriendRequest", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx, format!("/users/{id}/decline-friend-request"), None).await
+            post_action(&ctx.state, format!("/users/{id}/decline-friend-request"), None).await
         })
         .handle("friends:declineAllFriendRequests", |ctx, _| async move {
-            post_action(&ctx, "/user/friend-requests/decline-all".to_owned(), Some(json!({}))).await
+            post_action(&ctx.state, "/user/friend-requests/decline-all".to_owned(), Some(json!({}))).await
         })
         .handle("friends:sendFriendRequest", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx, format!("/users/{id}/request-friendship"), Some(json!({}))).await
+            post_action(&ctx.state, format!("/users/{id}/request-friendship"), Some(json!({}))).await
         })
         .handle("friends:unfriend", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx, format!("/users/{id}/unfriend"), None).await
+            post_action(&ctx.state, format!("/users/{id}/unfriend"), None).await
         })
         .handle("friends:follow", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx, format!("/users/{id}/follow"), None).await
+            post_action(&ctx.state, format!("/users/{id}/follow"), None).await
         })
         .handle("friends:unfollow", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            post_action(&ctx, format!("/users/{id}/unfollow"), None).await
+            post_action(&ctx.state, format!("/users/{id}/unfollow"), None).await
         })
         .handle("friends:isFollowing", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            Ok(is_following(&ctx, id).await)
+            Ok(is_following(&ctx.state, id).await)
         })
         .handle("friends:checkFriendStatus", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            Ok(check_friend_status(&ctx, id).await)
+            Ok(check_friend_status(&ctx.state, id).await)
         })
         .handle("friends:getFriendStatus", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            Ok(check_friend_status(&ctx, id).await.unwrap_or_else(|| "NotFriends".to_owned()))
+            Ok(check_friend_status(&ctx.state, id).await.unwrap_or_else(|| "NotFriends".to_owned()))
         })
         .handle("friends:searchFriends", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;
             let query: String = args.get(1)?;
             let limit = args.opt::<u32>(2)?.unwrap_or(50);
-            Ok(search_friends(&ctx, user_id, &query, limit).await)
+            Ok(search_friends(&ctx.state, user_id, &query, limit).await)
         });
 }

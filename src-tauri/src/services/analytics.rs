@@ -21,7 +21,7 @@ pub struct AnalyticsQueue {
 }
 
 impl AnalyticsQueue {
-    fn push(&self, event: String, payload: Value) {
+    pub fn push(&self, event: String, payload: Value) {
         let mut events = self.events.lock();
         if events.len() == MAX_QUEUED_EVENTS {
             events.pop_front();

@@ -9,6 +9,26 @@ pub fn iso8601_from_unix(secs: u64) -> String {
     format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}.000Z")
 }
 
+/// Current time in milliseconds since the Unix epoch (`Date.now()`).
+pub fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// `new Date().toISOString()`, millisecond precision.
+pub fn now_iso() -> String {
+    iso8601_from_millis(now_millis())
+}
+
+/// Formats Unix milliseconds as `YYYY-MM-DDTHH:MM:SS.mmmZ`.
+pub fn iso8601_from_millis(millis: u64) -> String {
+    let mut out = iso8601_from_unix(millis / 1000);
+    out.replace_range(20..23, &format!("{:03}", millis % 1000));
+    out
+}
+
 /// Howard Hinnant's days-to-civil algorithm.
 fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719_468;
@@ -29,5 +49,6 @@ mod tests {
     fn iso_dates() {
         assert_eq!(super::iso8601_from_unix(0), "1970-01-01T00:00:00.000Z");
         assert_eq!(super::iso8601_from_unix(1_700_000_000), "2023-11-14T22:13:20.000Z");
+        assert_eq!(super::iso8601_from_millis(1_700_000_000_042), "2023-11-14T22:13:20.042Z");
     }
 }

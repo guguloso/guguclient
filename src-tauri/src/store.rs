@@ -37,6 +37,11 @@ impl JsonStore {
         f(lookup(&data, key))
     }
 
+    /// Keys of the root object, in file order.
+    pub fn top_level_keys(&self) -> Vec<String> {
+        self.data.read().as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default()
+    }
+
     /// Mutates the whole document under the write lock, then persists once.
     pub fn update<R>(&self, f: impl FnOnce(&mut Value) -> R) -> AppResult<R> {
         let (result, snapshot) = {

@@ -4,7 +4,7 @@
 //! with the same safeStorage key, so the Electron and Rust builds share logins.
 //!
 //! Pending: `auth:login` (embedded roblox.com login window with captcha),
-//! browser tracker id provisioning, rotated-cookie persistence.
+//! rotated-cookie persistence.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use parking_lot::{Mutex, RwLock};
+use tokio::sync::watch;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -26,6 +27,22 @@ const ACTIVE_ACCOUNT_CHANGED: &str = "auth:activeAccountChanged";
 const FAVORITE_GAMES_TTL: Duration = Duration::from_secs(10 * 60);
 const PRESENCE_BATCH: usize = 100;
 const HEADSHOT_BATCH: usize = 100;
+const BROWSER_TRACKER_FIELD: &str = "browserTrackerId";
+
+/// `RBXEventTrackerV2=CreateDate=...&rbxid=...&browserid=<id>` → `<id>`.
+fn browser_tracker_from_set_cookie(header: &str) -> Option<String> {
+    let pair = header.split(';').next()?;
+    let (name, value) = pair.split_once('=')?;
+    if name.trim() != "RBXEventTrackerV2" {
+        return None;
+    }
+    let raw = value
+        .trim()
+        .split('&')
+        .find_map(|part| part.split_once('=').filter(|(k, _)| k.eq_ignore_ascii_case("browserid")).map(|(_, v)| v))
+        .filter(|v| !v.is_empty())?;
+    Some(urlencoding::decode(raw).map(|v| v.into_owned()).unwrap_or_else(|_| raw.to_owned()))
+}
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -101,6 +118,8 @@ pub struct AuthService {
     roblox: Arc<RobloxClient>,
     events: EventBus,
     favorites: Mutex<HashMap<u64, (Instant, Arc<[FavoriteGame]>)>>,
+    /// `onActiveAccountChanged` subscribers (social poller, metadata, ...).
+    account_tx: watch::Sender<Option<u64>>,
 }
 
 impl AuthService {
@@ -110,7 +129,8 @@ impl AuthService {
             .and_then(|bytes| serde_json::from_slice::<AuthFile>(&bytes).ok())
             .unwrap_or_default();
         tracing::info!(accounts = data.accounts.len(), "auth data loaded");
-        Self { file, data: RwLock::new(data), crypto, roblox, events, favorites: Mutex::new(HashMap::new()) }
+        let (account_tx, _) = watch::channel(data.active_user_id);
+        Self { file, data: RwLock::new(data), crypto, roblox, events, favorites: Mutex::new(HashMap::new()), account_tx }
     }
 
     // ------------------------------------------------------------- state
@@ -122,6 +142,77 @@ impl AuthService {
     pub fn is_authenticated(&self) -> bool {
         let data = self.data.read();
         data.active_user_id.is_some_and(|id| data.accounts.iter().any(|a| a.user_id == id))
+    }
+
+    /// `onActiveAccountChanged`: fires on every activation, logout included.
+    pub fn subscribe_account_changes(&self) -> watch::Receiver<Option<u64>> {
+        self.account_tx.subscribe()
+    }
+
+    /// `getStoredAccountFlags(userId).userAbove13 === true`.
+    pub fn is_user_above13(&self, user_id: u64) -> bool {
+        let data = self.data.read();
+        data.accounts.iter().any(|a| a.user_id == user_id && a.user_above13 == Some(true))
+    }
+
+    /// `fetchApiWithWebContext` credentials: the active cookie and its
+    /// browser tracker id, provisioned from `roblox.com/home` when missing.
+    pub async fn web_context(&self) -> Option<(String, String)> {
+        let user_id = self.current_user_id()?;
+        let cookie = self.cookie_for(user_id)?;
+        let stored = {
+            let data = self.data.read();
+            data.accounts
+                .iter()
+                .find(|a| a.user_id == user_id)
+                .and_then(|a| a.extra.get(BROWSER_TRACKER_FIELD))
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        };
+        if let Some(tracker) = stored.and_then(|encrypted| self.decrypt(&encrypted)) {
+            return Some((cookie, tracker));
+        }
+        match self.fetch_browser_tracker_id(&cookie).await {
+            Ok(Some(tracker)) => {
+                self.persist_browser_tracker_id(user_id, &tracker);
+                Some((cookie, tracker))
+            }
+            Ok(None) => None,
+            Err(error) => {
+                tracing::warn!(user_id, %error, "Auth: Failed to fetch browser tracker ID");
+                None
+            }
+        }
+    }
+
+    async fn fetch_browser_tracker_id(&self, cookie: &str) -> AppResult<Option<String>> {
+        let url = format!("{}/home", endpoints::WEB);
+        let response = self.roblox.get_as(&url, cookie).await?;
+        Ok(response
+            .headers()
+            .get_all(reqwest::header::SET_COOKIE)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .find_map(browser_tracker_from_set_cookie))
+    }
+
+    fn persist_browser_tracker_id(&self, user_id: u64, tracker: &str) {
+        let encrypted = match self.crypto.encrypt_base64(tracker) {
+            Ok(encrypted) => encrypted,
+            Err(error) => {
+                tracing::warn!(%error, "Auth: failed to encrypt browser tracker ID");
+                return;
+            }
+        };
+        let result = self.save(|data| {
+            if let Some(account) = data.accounts.iter_mut().find(|a| a.user_id == user_id) {
+                account.extra.insert(BROWSER_TRACKER_FIELD.to_owned(), Value::String(encrypted));
+            }
+        });
+        match result {
+            Ok(()) => tracing::info!(user_id, "Auth: Stored browser tracker ID"),
+            Err(error) => tracing::warn!(%error, "Auth: failed to persist browser tracker ID"),
+        }
     }
 
     fn accounts_json(&self) -> AppResult<Value> {
@@ -178,6 +269,7 @@ impl AuthService {
     fn notify_active_account_changed(&self, user_id: Option<u64>) {
         self.favorites.lock().clear();
         self.events.emit(ACTIVE_ACCOUNT_CHANGED, json!({ "userId": user_id }));
+        self.account_tx.send_replace(user_id);
     }
 
     // ------------------------------------------------------------- session
@@ -258,6 +350,23 @@ impl AuthService {
         self.save(|data| data.active_user_id = None)?;
         self.notify_active_account_changed(None);
         Ok(())
+    }
+
+    /// `initialize()`: restores the stored session before any poller runs.
+    pub async fn initialize(&self) {
+        if let Some(user_id) = self.current_user_id() {
+            match self.switch_account(user_id).await {
+                Ok(()) => return,
+                Err(error) => {
+                    tracing::error!(user_id, %error, "Failed to restore session");
+                    self.roblox.set_cookie(None);
+                    if let Err(error) = self.save(|data| data.active_user_id = None) {
+                        tracing::warn!(%error, "Auth: failed to persist session reset");
+                    }
+                }
+            }
+        }
+        self.notify_active_account_changed(None);
     }
 
     async fn switch_account(&self, user_id: u64) -> AppResult<()> {
