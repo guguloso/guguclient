@@ -1,0 +1,38 @@
+name: CI Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify main/preload syntax & package.json
+        run: |
+          node -c temp_fix/out/main/index.js
+          node -c temp_fix/out/preload/index.js
+          node -e "JSON.parse(require('fs').readFileSync('temp_fix/package.json', 'utf8'))"
+
+      - name: Verify PortableLauncher.cs compiles
+        shell: powershell
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          $src = Join-Path $env:TEMP "PortableLauncher.cs"
+          (Get-Content build\PortableLauncher.cs -Raw).Replace("__VERSION__", "1.0.16") | Set-Content $src -Encoding ASCII
+          & $csc /nologo /target:winexe /out:"$env:TEMP\LauncherCheck.exe" `
+            /reference:System.IO.Compression.dll `
+            /reference:System.IO.Compression.FileSystem.dll `
+            /reference:System.Windows.Forms.dll `
+            $src
+          if ($LASTEXITCODE -ne 0) { exit 1 }

@@ -1,4 +1,4 @@
-# Binaries and installers
+# Compiled binaries and installers
 *.exe
 *.dll
 *.node
@@ -10,18 +10,10 @@
 *.dat
 *.log
 
-# Build and dependencies
+# Build outputs and dependencies
 node_modules/
 build/work/
 build/node_modules/
 temp_fix/node_modules/
 lunar-extracted/
 app-asar/
-
-# Legacy decompiler reference files
-BUILDING.md
-docs/
-installer/
-native/
-src/
-tools/
