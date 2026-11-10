@@ -19,6 +19,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-global-shortcut = "2"
 # Native open/save dialogs (Electron `dialog.showOpenDialog`).
 rfd = { version = "0.15", default-features = false }
 
@@ -27,7 +28,7 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 
 # Async + concurrency
-tokio = { version = "1", features = ["sync", "time", "fs", "macros", "io-util"] }
+tokio = { version = "1", features = ["sync", "time", "fs", "macros", "io-util", "net"] }
 futures = "0.3"
 parking_lot = "0.12"
 
@@ -35,6 +36,7 @@ parking_lot = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip", "brotli"] }
 bytes = "1"
 urlencoding = "2"
+regex = "1"
 
 # Errors and logging
 thiserror = "2"
@@ -57,6 +59,7 @@ windows-sys = { version = "0.59", features = [
     "Win32_Security_Cryptography",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
 ] }
 
 [profile.release]

@@ -69,28 +69,14 @@ struct Running {
     version_hash: String,
 }
 
-/// `RunningInstancesService` entry (log watching lands with the second screen).
-#[derive(Clone)]
-pub struct RunningEntry {
-    pub instance_id: String,
-    pub instance_name: String,
-    pub product: String,
-    pub started_at: String,
-    pub ended_at: Option<String>,
-}
-
 #[derive(Default)]
 pub struct LaunchService {
     running: Mutex<HashMap<String, Running>>,
-    registry: Mutex<Vec<RunningEntry>>,
-    retained: Mutex<Vec<RunningEntry>>,
     mutex: SingletonMutex,
     /// Serializes single-instance close-and-spawn steps.
     single_instance_chain: tokio::sync::Mutex<()>,
     updating: Mutex<(usize, Vec<String>)>,
 }
-
-const RETAINED_INSTANCES_MAX: usize = 10;
 
 impl LaunchService {
     pub fn running_ids(&self) -> Vec<String> {
@@ -101,7 +87,7 @@ impl LaunchService {
         self.running.lock().contains_key(id)
     }
 
-    fn running_pids(&self) -> Vec<u32> {
+    pub fn running_pids(&self) -> Vec<u32> {
         self.running.lock().values().filter_map(|r| r.pid).collect()
     }
 
@@ -114,14 +100,6 @@ impl LaunchService {
             .map(|(id, _)| id.clone())
     }
 
-    /// `runningInstancesService.list()`.
-    pub fn running_list(&self) -> Vec<RunningEntry> {
-        self.registry.lock().clone()
-    }
-
-    pub fn recent_list(&self) -> Vec<RunningEntry> {
-        self.retained.lock().iter().rev().cloned().collect()
-    }
 }
 
 fn multi_instance_enabled(state: &AppState) -> bool {
@@ -583,7 +561,18 @@ fn apply_app_storage_overrides(state: &AppState, instance: &Instance) {
     if disable_startup {
         overrides.push(("LaunchAtStartup", "false"));
     }
-    if let (false, Some(path)) = (overrides.is_empty(), layout::system_app_storage()) {
+    if !overrides.is_empty() {
+        patch_app_storage(&overrides);
+    }
+    if disable_startup {
+        remove_startup_registration(state);
+    }
+}
+
+/// `patchAppStorageFile` on the system `appStorage.json`.
+fn patch_app_storage(overrides: &[(&str, &str)]) {
+    let Some(path) = layout::system_app_storage() else { return };
+    {
         let mut storage = match read_json(&path) {
             Some(Value::Object(map)) => map,
             Some(_) => {
@@ -596,7 +585,7 @@ fn apply_app_storage_overrides(state: &AppState, instance: &Instance) {
             None => serde_json::Map::new(),
         };
         let mut changed = false;
-        for (key, value) in overrides {
+        for &(key, value) in overrides {
             if storage.get(key).and_then(Value::as_str) != Some(value) {
                 storage.insert(key.to_owned(), Value::String(value.to_owned()));
                 changed = true;
@@ -619,8 +608,55 @@ fn apply_app_storage_overrides(state: &AppState, instance: &Instance) {
             }
         }
     }
-    if disable_startup {
-        remove_startup_registration(state);
+}
+
+/// `restoreStartupRunValue`: puts Roblox's launch-at-startup entry back
+/// (from the backup, or the newest system install).
+pub fn restore_startup_registration(state: &AppState) {
+    if query_startup_registration().is_some() {
+        tracing::debug!("Roblox startup registration already present");
+        return;
+    }
+    patch_app_storage(&[("LaunchAtStartup", "true")]);
+    let backup = read_json(&state.paths.settings_dir.join("roblox-startup-backup.json")).filter(|b| {
+        b.get("command").and_then(Value::as_str).is_some_and(|c| !c.is_empty())
+            && matches!(b.get("type").and_then(Value::as_str), Some("REG_SZ" | "REG_EXPAND_SZ"))
+    });
+    let mut entry = None;
+    if let Some(backup) = backup {
+        let command = backup["command"].as_str().unwrap_or("").to_owned();
+        let exe = match command.strip_prefix('"') {
+            Some(rest) => rest.split('"').next().unwrap_or("").to_owned(),
+            None => command.split_whitespace().next().unwrap_or("").to_owned(),
+        };
+        if !exe.is_empty() && std::path::Path::new(&exe).exists() {
+            entry = Some((command, backup["type"].as_str().unwrap_or("REG_SZ").to_owned()));
+        } else {
+            tracing::debug!("Saved Roblox startup command is stale; using newest install");
+        }
+    }
+    if entry.is_none() {
+        let versions = dirs::data_local_dir().map(|d| d.join("Roblox").join("Versions"));
+        let newest = versions
+            .and_then(|dir| std::fs::read_dir(dir).ok())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("version-"))
+            .map(|e| e.path().join("RobloxPlayerBeta.exe"))
+            .filter_map(|p| Some((std::fs::metadata(&p).ok()?.modified().ok()?, p)))
+            .max_by_key(|(t, _)| *t)
+            .map(|(_, p)| p);
+        entry = newest.map(|p| (format!("\"{}\" --launch-to-tray", p.display()), "REG_SZ".to_owned()));
+    }
+    let Some((command, kind)) = entry else {
+        tracing::info!("No Roblox startup command to restore; re-enabled the json flag only");
+        return;
+    };
+    match hidden_command("reg").args(["add", STARTUP_RUN_KEY, "/v", STARTUP_RUN_VALUE, "/t", &kind, "/d", &command, "/f"]).status() {
+        Ok(status) if status.success() => tracing::info!("Restored Roblox launch-at-startup registration"),
+        Ok(status) => tracing::warn!("Failed to restore Roblox startup registration: {status}"),
+        Err(error) => tracing::warn!("Failed to restore Roblox startup registration: {error}"),
     }
 }
 
@@ -874,20 +910,10 @@ fn handle_exit(state: &AppState, id: &str, code: Option<i32>) {
         avatar.release(state);
     }
     instances::mark_stopped(state, id);
-    {
-        let mut registry = state.launch.registry.lock();
-        if let Some(pos) = registry.iter().position(|e| e.instance_id == id) {
-            let mut entry = registry.remove(pos);
-            tracing::info!("Unregistered running instance: {id}");
-            if entry.product == "player" {
-                entry.ended_at = Some(crate::util::now_iso());
-                let mut retained = state.launch.retained.lock();
-                retained.retain(|e| e.instance_id != id);
-                retained.push(entry);
-                while retained.len() > RETAINED_INSTANCES_MAX {
-                    retained.remove(0);
-                }
-            }
+    state.running.unregister(state, id);
+    if running.product == "player" {
+        if let Some(state) = state.arc() {
+            crate::services::activity::stop_tracking(&state, id);
         }
     }
     let code = code.unwrap_or(-1);
@@ -1018,6 +1044,7 @@ async fn prepare_and_spawn(
                 "Failed to acquire ROBLOX singleton mutex on Windows",
             ));
         }
+        let excluded = if product == "player" { state.running.snapshot_player_log_files(state, id) } else { Vec::new() };
         // CreateProcess blocks ~15s while Roblox's protected binary loads
         // (same in the Electron build), so keep it off the async workers.
         let (binary, url, child_env) =
@@ -1038,19 +1065,7 @@ async fn prepare_and_spawn(
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_owned();
-        {
-            let mut registry = state.launch.registry.lock();
-            if !registry.iter().any(|e| e.instance_id == id) {
-                registry.push(RunningEntry {
-                    instance_id: id.to_owned(),
-                    instance_name: name.clone(),
-                    product: product.clone(),
-                    started_at: crate::util::now_iso(),
-                    ended_at: None,
-                });
-                tracing::info!("Registered running instance: {name}");
-            }
-        }
+        state.running.register(state, id, &name, &product, excluded);
         state.launch.running.lock().insert(
             id.to_owned(),
             Running {
@@ -1062,6 +1077,12 @@ async fn prepare_and_spawn(
             },
         );
         monitor(state, id.to_owned(), Some(pid));
+        if product == "player" {
+            crate::services::activity::start_tracking(state, id, crate::services::activity::launch_context(options));
+        }
+        if product == "player" && state.settings.get_bool("open-second-screen-on-launch") {
+            crate::services::mission_control::open(state, Some(id));
+        }
         tracing::info!("Successfully launched instance '{name}' ({id})");
         Ok(())
     };
@@ -1236,37 +1257,13 @@ fn instance_name(instance: &Instance) -> &str {
     instance.get("name").and_then(Value::as_str).unwrap_or("")
 }
 
-/// `RunningInstancesService.list()` / `listRecent()` entry shape.
-fn entry_json(entry: &RunningEntry) -> Value {
-    json!({
-        "instanceId": entry.instance_id,
-        "instanceName": entry.instance_name,
-        "product": entry.product,
-        "hasSecondScreen": false,
-        "startedAt": entry.started_at,
-        "endedAt": entry.ended_at,
-        "logCount": 0,
-    })
-}
 
-pub fn register_running(router: &mut Router) {
-    router
-        .handle("secondScreen:getRunningInstances", |ctx, _| async move {
-            Ok(ctx
-                .state
-                .launch
-                .running_list()
-                .iter()
-                .map(entry_json)
-                .collect::<Vec<_>>())
-        })
-        .handle("secondScreen:getRecentInstances", |ctx, _| async move {
-            Ok(ctx
-                .state
-                .launch
-                .recent_list()
-                .iter()
-                .map(entry_json)
-                .collect::<Vec<_>>())
-        });
+/// `handleTrackedSessionEnded`: `close-to-launcher` closes the game when the
+/// player leaves it.
+pub fn on_session_ended(state: &Arc<AppState>, session: &Value) {
+    let id = session["instanceId"].as_str().unwrap_or("");
+    if session["reason"] != "leave" || !state.settings.get_bool("close-to-launcher") || !state.launch.is_running(id) {
+        return;
+    }
+    kill_instance(state, id);
 }

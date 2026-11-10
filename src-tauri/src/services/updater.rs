@@ -160,6 +160,18 @@ impl UpdaterService {
 
     /// `setServerChannel` → `syncFeedOptions`: the Gugu feed is always
     /// `latest`, but the state is re-emitted like the original.
+    /// `resetEnvironmentState` (after `use-dev-services` flips).
+    pub fn reset_environment_state(&self, state: &AppState) {
+        {
+            let mut inner = self.inner.lock();
+            inner.update_downloaded = false;
+            inner.downloaded_path = None;
+            inner.notified_deferred_install = false;
+            inner.bypass_focus_check = true;
+        }
+        self.set_server_channel(state);
+    }
+
     pub fn set_server_channel(&self, state: &AppState) {
         self.patch(state, |s| s.channel = "latest");
     }

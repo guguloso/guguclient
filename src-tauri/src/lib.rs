@@ -51,6 +51,7 @@ pub fn run() {
             on_second_instance(app, argv)
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol(
             services::thumbnails::PROTOCOL,
             services::thumbnails::protocol_handler,
@@ -76,6 +77,7 @@ pub fn run() {
                 if let Some(state) = app.try_state::<Arc<AppState>>() {
                     state.social.stop();
                     crate::services::game_avatar::stop(&state);
+                    crate::services::discord_rpc::shutdown(&state);
                     crate::services::version_maintenance::stop_background_updates(&state);
                     state.game_communities.flush(&state);
                 }
@@ -85,7 +87,7 @@ pub fn run() {
 
 /// Builds a frameless app window running the renderer with the bridge.
 /// `route` is the initial hash route (Electron's `loadFile({ hash })`).
-fn app_window_builder<'a>(
+pub(crate) fn app_window_builder<'a>(
     app: &'a AppHandle,
     label: &'a str,
     route: Option<&str>,
@@ -130,10 +132,19 @@ pub(crate) fn show_updater_window(app: &AppHandle) -> tauri::Result<()> {
 }
 
 /// `isMainWindowStashed()`: minimized or hidden (to tray).
+/// `updateBackgroundedState`: pollers slow down while the main window is
+/// stashed and no Roblox instance is running.
 fn update_backgrounded(window: &WebviewWindow, state: &AppState) {
     let stashed = window.is_minimized().unwrap_or(false) || !window.is_visible().unwrap_or(true);
-    state.social.set_backgrounded(stashed);
-    state.chat.set_backgrounded(stashed);
+    let backgrounded = stashed && state.running.ids().is_empty();
+    state.social.set_backgrounded(backgrounded);
+    state.chat.set_backgrounded(backgrounded);
+}
+
+pub(crate) fn refresh_backgrounded(state: &AppState) {
+    if let Some(window) = state.app.get_webview_window(MAIN_WINDOW) {
+        update_backgrounded(&window, state);
+    }
 }
 
 fn init_logging(paths: &LauncherPaths) -> Option<WorkerGuard> {

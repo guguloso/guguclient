@@ -23,6 +23,10 @@ use crate::state::AppState;
 use crate::util::now_iso;
 
 const PROD_API_URL: &str = "https://api.lunarrobloxprod.com";
+const DEV_API_URL: &str = "https://api.lunarrobloxdev.com";
+
+/// `globalThis.USE_DEV_SERVICES` (the `use-dev-services` setting).
+pub static USE_DEV_SERVICES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 const USER_AGENT: &str = concat!("lunar-for-roblox/", env!("CARGO_PKG_VERSION"));
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_UPDATER_CHANNEL: &str = "latest";
@@ -54,7 +58,8 @@ impl LunarApi {
         path: &str,
         query: &[(&str, &str)],
     ) -> AppResult<T> {
-        let url = format!("{PROD_API_URL}{path}");
+        let base = if USE_DEV_SERVICES.load(std::sync::atomic::Ordering::Relaxed) { DEV_API_URL } else { PROD_API_URL };
+        let url = format!("{base}{path}");
         let result = async {
             let response = self
                 .http

@@ -60,6 +60,11 @@ pub struct AppState {
     pub outfits: crate::services::outfits::OutfitsState,
     pub game_avatar: crate::services::game_avatar::GameAvatarState,
     pub version_maintenance: crate::services::version_maintenance::MaintenanceState,
+    pub running: crate::services::running::RunningInstances,
+    pub activity: crate::services::activity::ActivityState,
+    pub discord: crate::services::discord_rpc::DiscordRpc,
+    pub launcher_notifications: crate::services::launcher_notifications::NotificationsState,
+    pub hotkey: crate::services::mission_control::HotkeyState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -110,12 +115,23 @@ impl AppState {
             outfits: Default::default(),
             game_avatar: Default::default(),
             version_maintenance: Default::default(),
+            running: Default::default(),
+            activity: crate::services::activity::ActivityState::load(&paths.base),
+            discord: Default::default(),
+            launcher_notifications: Default::default(),
+            hotkey: Default::default(),
             game_communities: Default::default(),
             app,
             events,
             roblox,
             paths,
         })
+    }
+
+    /// The shared handle, for work that must outlive a borrowed `&AppState`.
+    pub fn arc(&self) -> Option<Arc<AppState>> {
+        use tauri::Manager;
+        self.app.try_state::<Arc<AppState>>().map(|s| s.inner().clone())
     }
 
     /// `analyticsService.track`: queued only when collection is allowed.
@@ -139,6 +155,8 @@ impl AppState {
             crate::services::metadata::MetadataService::initialize(&state);
             crate::services::chat::ChatPoller::start(&state);
             crate::services::social::SocialService::start(&state);
+            crate::services::mission_control::sync_hotkey(&state);
+            crate::services::discord_rpc::start_stop(&state);
             crate::services::version_maintenance::start_stop_background_updates(&state);
             crate::services::game_avatar::start_recovery(&state);
             crate::services::protocol::sync_handlers(&state).await;

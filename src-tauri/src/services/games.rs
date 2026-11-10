@@ -55,6 +55,11 @@ pub fn approval_percentage(up: u64, down: u64) -> u64 {
 }
 
 pub async fn details(ctx: &Ctx, universe_ids: &[u64]) -> AppResult<Vec<Value>> {
+    details_for(&ctx.state, universe_ids).await
+}
+
+/// `getGameDetails` without an IPC context.
+pub async fn details_for(state: &std::sync::Arc<AppState>, universe_ids: &[u64]) -> AppResult<Vec<Value>> {
     if universe_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -63,10 +68,8 @@ pub async fn details(ctx: &Ctx, universe_ids: &[u64]) -> AppResult<Vec<Value>> {
         endpoints::GAMES_V1,
         join_ids(universe_ids)
     );
-    let envelope: DataEnvelope<Value> = ctx.state.roblox.get(&url).await?;
-    ctx.state
-        .game_communities
-        .record_games(&ctx.state, &envelope.data);
+    let envelope: DataEnvelope<Value> = state.roblox.get(&url).await?;
+    state.game_communities.record_games(state, &envelope.data);
     Ok(envelope.data)
 }
 
@@ -93,19 +96,20 @@ async fn votes(ctx: &Ctx, universe_ids: &[u64]) -> AppResult<BTreeMap<String, Va
 }
 
 /// Square game icons, cached (`getGameThumbnails`).
-pub async fn icons(
-    ctx: &Ctx,
-    universe_ids: &[u64],
-    size: &str,
-) -> AppResult<BTreeMap<String, String>> {
+pub async fn icons(ctx: &Ctx, universe_ids: &[u64], size: &str) -> AppResult<BTreeMap<String, String>> {
+    icons_for(&ctx.state, universe_ids, size).await
+}
+
+/// `getGameThumbnails` without an IPC context.
+pub async fn icons_for(state: &AppState, universe_ids: &[u64], size: &str) -> AppResult<BTreeMap<String, String>> {
     let query = IdQuery {
         kind: "GameIcon",
         size,
         format: "Png",
         include_profile_frame: None,
     };
-    let roblox = &ctx.state.roblox;
-    ctx.state
+    let roblox = &state.roblox;
+    state
         .thumbnails
         .batch_by_id(universe_ids, &query, |missing| async move {
             let pages = try_join_all(missing.chunks(THUMBNAIL_BATCH_SIZE).map(|chunk| {
