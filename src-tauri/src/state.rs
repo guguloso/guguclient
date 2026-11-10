@@ -58,6 +58,7 @@ pub struct AppState {
     pub private_servers: crate::services::private_servers::PrivateServersState,
     pub avatar: crate::services::avatar::AvatarState,
     pub outfits: crate::services::outfits::OutfitsState,
+    pub game_avatar: crate::services::game_avatar::GameAvatarState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -106,6 +107,7 @@ impl AppState {
             private_servers: Default::default(),
             avatar: Default::default(),
             outfits: Default::default(),
+            game_avatar: Default::default(),
             game_communities: Default::default(),
             app,
             events,
@@ -135,6 +137,7 @@ impl AppState {
             crate::services::metadata::MetadataService::initialize(&state);
             crate::services::chat::ChatPoller::start(&state);
             crate::services::social::SocialService::start(&state);
+            crate::services::game_avatar::start_recovery(&state);
             crate::services::protocol::sync_handlers(&state).await;
             let argv: Vec<String> = std::env::args().collect();
             if let Some(url) = crate::services::protocol::extract_protocol_url(&argv) {

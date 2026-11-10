@@ -328,6 +328,13 @@ impl AuthService {
         self.cookie_for(user_id.or_else(|| self.current_user_id())?)
     }
 
+    /// `getRequestHeadersForUser`: the stored account's cookie unless its
+    /// session was marked invalid.
+    pub fn request_cookie_for_user(&self, user_id: u64) -> Option<String> {
+        let valid = self.data.read().accounts.iter().any(|a| a.user_id == user_id && a.session_invalid != Some(true));
+        if valid { self.cookie_for(user_id) } else { None }
+    }
+
     pub fn has_account(&self, user_id: u64) -> bool {
         self.data
             .read()

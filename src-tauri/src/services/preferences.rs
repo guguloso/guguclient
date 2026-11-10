@@ -63,6 +63,18 @@ impl GamePreferences {
         valid
     }
 
+    /// The `universes` section (game avatar picks) of the same file; the
+    /// caller validates the records.
+    pub fn read_universes(&self) -> Map<String, Value> {
+        self.store.read("universes", |v| v.and_then(Value::as_object).cloned()).unwrap_or_default()
+    }
+
+    pub fn write_universes(&self, universes: &Map<String, Value>) {
+        if let Err(error) = self.store.update(|root| root["universes"] = Value::Object(universes.clone())) {
+            tracing::warn!(%error, "Failed to write game avatar preferences");
+        }
+    }
+
     pub fn write(&self, games: &Map<String, Value>) {
         if let Err(error) = self
             .store

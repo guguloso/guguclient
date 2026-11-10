@@ -15,6 +15,7 @@ use crate::error::AppResult;
 use crate::ipc::{Ctx, Router};
 use crate::roblox::endpoints::{self, join_ids};
 use crate::services::thumbnails::{IdQuery, ThumbEntry, ThumbPage};
+use crate::state::AppState;
 
 const THUMBNAIL_BATCH_SIZE: usize = 100;
 
@@ -162,9 +163,9 @@ pub async fn wide_thumbnails(
         .await
 }
 
-async fn universe_by_place(ctx: &Ctx, place_id: u64) -> Option<u64> {
+pub async fn universe_by_place(state: &AppState, place_id: u64) -> Option<u64> {
     let url = format!("{}/places/{place_id}/universe", endpoints::UNIVERSES_V1);
-    match ctx.state.roblox.get::<Value>(&url).await {
+    match state.roblox.get::<Value>(&url).await {
         Ok(body) => body.get("universeId").and_then(Value::as_u64),
         Err(error) => {
             tracing::warn!(%error, "Failed to resolve universe for place");
@@ -208,7 +209,7 @@ pub fn register(router: &mut Router) {
         })
         .handle("games:getUniverseByPlace", |ctx, args| async move {
             let place_id: u64 = args.get(0)?;
-            Ok(universe_by_place(&ctx, place_id).await)
+            Ok(universe_by_place(&ctx.state, place_id).await)
         })
         .handle("games:getUserGames", |ctx, args| async move {
             let user_id: u64 = args.get(0)?;

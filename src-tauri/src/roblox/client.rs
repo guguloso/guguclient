@@ -116,6 +116,13 @@ impl RobloxClient {
         self.send(method, url, bytes, Auth::Session).await
     }
 
+    /// Any method as an explicit account (`None` = the active session).
+    pub async fn request_for(&self, method: Method, url: &str, body: Option<&serde_json::Value>, cookie: Option<&str>) -> AppResult<Response> {
+        let bytes = body.map(serde_json::to_vec).transpose()?.map(Bytes::from);
+        let auth = cookie.map_or(Auth::Session, Auth::Cookie);
+        self.send(method, url, bytes, auth).await
+    }
+
     /// POST with the session cookie; returns only the HTTP status.
     pub async fn post_raw<B: Serialize + ?Sized>(&self, url: &str, body: &B) -> AppResult<u16> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);

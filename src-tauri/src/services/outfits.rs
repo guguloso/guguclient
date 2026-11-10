@@ -442,7 +442,7 @@ fn signed_out() -> Value {
 
 fn track_save(state: &AppState, outfit: &Map<String, Value>, in_folder: bool, source: &str) {
     state.track(
-        "outfit.save",
+        "marketplace.outfit.save",
         json!({ "in_folder": in_folder, "item_count": outfit["items"].as_array().map_or(0, Vec::len), "outfit_id": outfit["id"], "source": source }),
     );
 }
@@ -547,6 +547,65 @@ fn edit_outfit(state: &AppState, outfit_id: &str, f: impl FnOnce(&Map<String, Va
     mutate(state, |lib| {
         let outfit = lib.outfits.get(outfit_id)?;
         Some(replace(lib, f(outfit)?))
+    })
+}
+
+/// `OutfitsService.list`.
+pub fn list(state: &AppState) -> Value {
+    current(state).map(|(_, l)| view(&l)).unwrap_or_else(empty_view)
+}
+
+/// `findForUser`: an outfit of the active or another stored account.
+pub fn find_for_user(state: &AppState, user: u64, outfit_id: &str) -> Option<Map<String, Value>> {
+    if user == 0 {
+        return None;
+    }
+    match current(state) {
+        Some((u, lib)) if u == user => lib.outfits.get(outfit_id).cloned(),
+        _ => load(state, user).outfits.get(outfit_id).cloned(),
+    }
+}
+
+/// `withOwnership` + `recordOutfitOwnership`.
+fn with_ownership(outfit: &Map<String, Value>, ownership: &HashMap<String, bool>) -> Map<String, Value> {
+    let mut o = outfit.clone();
+    if let Some(items) = o.get_mut("items").and_then(Value::as_array_mut) {
+        for item in items.iter_mut() {
+            if let Some(owned) = ownership.get(&item_key(item)) {
+                item["owned"] = json!(owned);
+            }
+        }
+    }
+    o.insert("ownershipCheckedAt".into(), json!(now_iso()));
+    o
+}
+
+/// `recordOwnership`.
+pub fn record_ownership(state: &AppState, outfit_id: &str, ownership: &HashMap<String, bool>) -> Value {
+    edit_outfit(state, outfit_id, |o| Some(with_ownership(o, ownership)))
+}
+
+/// `recordWear`: ownership plus `lastWornAt`.
+pub fn record_wear(state: &AppState, outfit_id: &str, ownership: &HashMap<String, bool>) -> Value {
+    edit_outfit(state, outfit_id, |o| {
+        let mut o = with_ownership(o, ownership);
+        o.insert("lastWornAt".into(), o["ownershipCheckedAt"].clone());
+        Some(o)
+    })
+}
+
+/// `linkRobloxOutfit`: links (or clears) the character made from an outfit.
+pub fn link_roblox_outfit(state: &AppState, outfit_id: &str, roblox_outfit: Option<u64>) -> Value {
+    edit_outfit(state, outfit_id, |o| {
+        if o.get("robloxOutfitId").and_then(Value::as_u64) == roblox_outfit {
+            return None;
+        }
+        let mut o = o.clone();
+        match roblox_outfit {
+            Some(id) => o.insert("robloxOutfitId".into(), json!(id)),
+            None => o.remove("robloxOutfitId"),
+        };
+        Some(o)
     })
 }
 

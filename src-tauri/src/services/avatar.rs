@@ -149,6 +149,10 @@ async fn success_of(state: &AppState, url: &str, body: &Value) -> AppResult<bool
 
 /// `AvatarAccountClient.setWearingAssets` (also used by outfits/equip).
 pub async fn set_wearing_assets(state: &AppState, assets: &[Value]) -> AppResult<Value> {
+    set_wearing_assets_as(state, assets, None).await
+}
+
+async fn set_wearing_assets_as(state: &AppState, assets: &[Value], cookie: Option<&str>) -> AppResult<Value> {
     let assets: Vec<Value> = assets
         .iter()
         .map(|a| match a.get("meta").filter(|m| !m.is_null()) {
@@ -157,7 +161,9 @@ pub async fn set_wearing_assets(state: &AppState, assets: &[Value]) -> AppResult
         })
         .collect();
     let body = json!({ "avatarDefinition": { "updateAvatarModel": { "assets": assets } }, "updateTypes": ["UpdateAssets"] });
-    let r: Value = state.roblox.patch(&format!("{AVATAR}/v4/avatar"), &body).await?;
+    let url = format!("{AVATAR}/v4/avatar");
+    let response = state.roblox.request_for(Method::PATCH, &url, Some(&body), cookie).await?;
+    let r: Value = crate::roblox::RobloxClient::decode(&url, response).await?;
     let success = r.get("success").and_then(Value::as_bool).unwrap_or(false);
     let mut result = json!({ "success": success });
     let invalid: Vec<Value> =
@@ -194,11 +200,24 @@ pub async fn current_outfit_payload(state: &AppState) -> AppResult<Value> {
     Ok(payload)
 }
 
-/// `readSavedAvatarWriteResponse`.
-async fn saved_avatar_write(state: &AppState, method: Method, url: &str, body: &Value, operation: &str) -> AppResult<Value> {
+/// `SavedAvatarWriteError` (or any other failure, with no status).
+pub struct SavedAvatarError {
+    pub status: Option<u16>,
+    pub code: Option<i64>,
+    pub message: String,
+}
+
+impl From<AppError> for SavedAvatarError {
+    fn from(error: AppError) -> Self {
+        Self { status: None, code: None, message: error.to_string() }
+    }
+}
+
+/// `readSavedAvatarWriteResponse`, keeping the Roblox error code.
+async fn saved_avatar_write_detailed(state: &AppState, method: Method, url: &str, body: &Value, operation: &str) -> Result<Value, SavedAvatarError> {
     let response = state.roblox.request(method, url, Some(body)).await?;
     if response.status().is_success() {
-        return Ok(response.json().await?);
+        return Ok(response.json().await.map_err(AppError::from)?);
     }
     let status = response.status().as_u16();
     let parsed: Value = serde_json::from_str(&response.text().await.unwrap_or_default()).unwrap_or(Value::Null);
@@ -209,7 +228,194 @@ async fn saved_avatar_write(state: &AppState, method: Method, url: &str, body: &
         .filter(|m| !m.is_empty())
         .map(str::to_owned)
         .unwrap_or_else(|| format!("Failed to {operation} saved avatar"));
-    Err(AppError::Api { status, url: url.to_owned(), message })
+    Err(SavedAvatarError { status: Some(status), code: error.and_then(|e| e.get("code")).and_then(Value::as_i64), message })
+}
+
+/// `createSavedAvatar`.
+pub async fn create_saved_avatar(state: &AppState, payload: &Value) -> Result<Value, SavedAvatarError> {
+    let created = saved_avatar_write_detailed(state, Method::POST, &format!("{AVATAR}/v3/outfits/create"), payload, "create").await.inspect_err(|e| {
+        tracing::error!("Avatar: Failed to create saved avatar: {}", e.message);
+    })?;
+    if !created.get("id").is_some_and(Value::is_number) {
+        tracing::error!("Avatar: Create saved avatar returned invalid response");
+        return Err(AppError::msg("Failed to create saved avatar").into());
+    }
+    Ok(saved_summary(&created, "Untitled Outfit", true))
+}
+
+/// `updateSavedAvatar`: fills a sparse response from the outfit details.
+pub async fn update_saved_avatar(state: &AppState, id: u64, payload: &Value) -> Result<Value, SavedAvatarError> {
+    let mut updated = saved_avatar_write_detailed(state, Method::PATCH, &format!("{AVATAR}/v3/outfits/{id}"), payload, "update").await.inspect_err(|e| {
+        tracing::error!("Avatar: Failed to update saved avatar {id}: {}", e.message);
+    })?;
+    if !updated.get("id").is_some_and(Value::is_number) {
+        return Err(AppError::msg("Failed to update saved avatar").into());
+    }
+    let missing =
+        updated.get("name").and_then(Value::as_str).is_none_or(str::is_empty) || updated.get("isEditable").is_none() || updated.get("outfitType").is_none();
+    if missing {
+        match state.roblox.get::<Value>(&format!("{AVATAR}/v3/outfits/{id}/details")).await {
+            Ok(details) => {
+                for key in ["name", "isEditable", "outfitType"] {
+                    if updated.get(key).is_none_or(|v| v.is_null() || v.as_str() == Some("")) {
+                        if let Some(v) = details.get(key) {
+                            updated[key] = v.clone();
+                        }
+                    }
+                }
+            }
+            Err(error) => tracing::warn!("Avatar: Failed to fetch outfit details after update: {error}"),
+        }
+    }
+    Ok(saved_summary(&updated, "Untitled Outfit", true))
+}
+
+/// `getSavedAvatars` (public per-user character list).
+pub async fn saved_avatars(state: &AppState, user: u64, token: Option<&str>, per_page: Option<u64>) -> AppResult<Value> {
+    let mut url = format!("{AVATAR}/v2/avatar/users/{user}/outfits?");
+    if let Some(t) = token.filter(|t| !t.is_empty()) {
+        url.push_str(&format!("paginationToken={}&", urlencoding::encode(t)));
+    }
+    if let Some(n) = per_page.filter(|n| *n > 0) {
+        url.push_str(&format!("itemsPerPage={n}"));
+    }
+    let r: Value = state.roblox.get(url.trim_end_matches(['&', '?'])).await.inspect_err(|error| {
+        tracing::error!("Avatar: Failed to get saved avatars: {error}");
+    })?;
+    let data: Vec<Value> = r
+        .get("data")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|o| o.get("id").is_some_and(Value::is_number))
+        .map(|o| saved_summary(o, "Untitled Outfit", false))
+        .collect();
+    let token = r.get("paginationToken").and_then(Value::as_str).filter(|t| !t.is_empty());
+    Ok(json!({ "data": data, "paginationToken": token }))
+}
+
+/// Who an avatar write acts as: the active session (`createActiveWearTarget`)
+/// or a stored account (`AvatarService.forAccount`).
+#[derive(Clone, Copy)]
+pub struct AvatarTarget {
+    pub user_id: u64,
+    account: bool,
+}
+
+/// `AvatarAccountClient.getCharacter`.
+pub enum CharacterLookup {
+    Found(Value),
+    Missing,
+    Failed,
+}
+
+impl AvatarTarget {
+    pub fn active(state: &AppState) -> Option<Self> {
+        state.auth.current_user_id().map(|user_id| Self { user_id, account: false })
+    }
+
+    pub fn for_account(state: &AppState, user_id: u64) -> Option<Self> {
+        state.auth.request_cookie_for_user(user_id).map(|_| Self { user_id, account: true })
+    }
+
+    pub fn is_current(&self, state: &AppState) -> bool {
+        if self.account {
+            state.auth.request_cookie_for_user(self.user_id).is_some()
+        } else {
+            state.auth.current_user_id() == Some(self.user_id)
+        }
+    }
+
+    fn cookie(&self, state: &AppState) -> AppResult<Option<String>> {
+        if !self.account {
+            return Ok(None);
+        }
+        state.auth.request_cookie_for_user(self.user_id).map(Some).ok_or_else(|| AppError::msg("The account's session is no longer available"))
+    }
+
+    async fn call(&self, state: &AppState, method: Method, url: &str, body: Option<&Value>) -> AppResult<Value> {
+        let cookie = self.cookie(state)?;
+        let response = state.roblox.request_for(method, url, body, cookie.as_deref()).await?;
+        crate::roblox::RobloxClient::decode(url, response).await
+    }
+
+    async fn success(&self, state: &AppState, url: &str, body: &Value) -> AppResult<bool> {
+        let r = self.call(state, Method::POST, url, Some(body)).await?;
+        Ok(r.get("success").and_then(Value::as_bool).unwrap_or(false))
+    }
+
+    pub async fn get_avatar(&self, state: &AppState) -> AppResult<Value> {
+        Ok(normalize_model(self.call(state, Method::GET, &format!("{AVATAR}/v1/avatar"), None).await?))
+    }
+
+    pub async fn get_rules(&self, state: &AppState) -> AppResult<Value> {
+        let key = format!("rules:{}", self.user_id);
+        if let Some((at, rules)) = state.avatar.rules.lock().get(&key) {
+            if at.elapsed() < RULES_TTL {
+                return Ok(rules.clone());
+            }
+        }
+        let rules = self.call(state, Method::GET, &format!("{AVATAR}/v1/avatar-rules"), None).await?;
+        state.avatar.rules.lock().insert(key, (Instant::now(), rules.clone()));
+        Ok(rules)
+    }
+
+    pub async fn set_player_avatar_type(&self, state: &AppState, rig: &Value) -> AppResult<bool> {
+        self.success(state, &format!("{AVATAR}/v1/avatar/set-player-avatar-type"), &json!({ "playerAvatarType": rig })).await
+    }
+
+    pub async fn set_body_colors(&self, state: &AppState, colors: &Value) -> AppResult<bool> {
+        self.success(state, &format!("{AVATAR}/v1/avatar/set-body-colors"), colors).await
+    }
+
+    pub async fn set_scales(&self, state: &AppState, scales: &Value) -> AppResult<bool> {
+        self.success(state, &format!("{AVATAR}/v1/avatar/set-scales"), scales).await
+    }
+
+    pub async fn set_body_color3s(&self, state: &AppState, colors: &Value) -> AppResult<bool> {
+        self.success(state, &format!("{AVATAR}/v2/avatar/set-body-colors"), colors).await
+    }
+
+    pub async fn get_body_color3s(&self, state: &AppState) -> AppResult<Value> {
+        let avatar = self.call(state, Method::GET, &format!("{AVATAR}/v2/avatar/avatar"), None).await?;
+        Ok(avatar.get("bodyColor3s").cloned().unwrap_or(Value::Null))
+    }
+
+    pub async fn set_wearing_assets(&self, state: &AppState, assets: &[Value]) -> AppResult<Value> {
+        let cookie = self.cookie(state)?;
+        set_wearing_assets_as(state, assets, cookie.as_deref()).await
+    }
+
+    pub async fn get_character(&self, state: &AppState, outfit: u64) -> CharacterLookup {
+        let url = format!("{AVATAR}/v3/outfits/{outfit}/details");
+        let result = async {
+            let cookie = self.cookie(state)?;
+            state.roblox.request_for(Method::GET, &url, None, cookie.as_deref()).await
+        }
+        .await;
+        match result {
+            Ok(response) if response.status().is_success() => match response.json().await {
+                Ok(character) => CharacterLookup::Found(character),
+                Err(error) => {
+                    tracing::warn!("Avatar: character {outfit} lookup failed: {error}");
+                    CharacterLookup::Failed
+                }
+            },
+            Ok(response) => {
+                let status = response.status().as_u16();
+                tracing::warn!("Avatar: character {outfit} lookup was refused ({status})");
+                if matches!(status, 400 | 403 | 404) {
+                    CharacterLookup::Missing
+                } else {
+                    CharacterLookup::Failed
+                }
+            }
+            Err(error) => {
+                tracing::warn!("Avatar: character {outfit} lookup failed: {error}");
+                CharacterLookup::Failed
+            }
+        }
+    }
 }
 
 fn saved_summary(raw: &Value, fallback_name: &str, editable_default: bool) -> Value {
@@ -519,26 +725,7 @@ pub fn register(router: &mut Router) {
             let user: u64 = args.get(0)?;
             let token: Option<String> = args.opt(1)?;
             let per_page: Option<u64> = args.opt(2)?;
-            let mut url = format!("{AVATAR}/v2/avatar/users/{user}/outfits?");
-            if let Some(t) = token.filter(|t| !t.is_empty()) {
-                url.push_str(&format!("paginationToken={}&", urlencoding::encode(&t)));
-            }
-            if let Some(n) = per_page.filter(|n| *n > 0) {
-                url.push_str(&format!("itemsPerPage={n}"));
-            }
-            let r: Value = ctx.state.roblox.get(url.trim_end_matches(['&', '?'])).await.inspect_err(|error| {
-                tracing::error!("Avatar: Failed to get saved avatars: {error}");
-            })?;
-            let data: Vec<Value> = r
-                .get("data")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter(|o| o.get("id").is_some_and(Value::is_number))
-                .map(|o| saved_summary(o, "Untitled Outfit", false))
-                .collect();
-            let token = r.get("paginationToken").and_then(Value::as_str).filter(|t| !t.is_empty());
-            Ok(json!({ "data": data, "paginationToken": token }))
+            saved_avatars(&ctx.state, user, token.as_deref(), per_page).await
         })
         .handle("avatar:createSavedAvatarFromCurrent", |ctx, args| async move {
             let name: Option<String> = args.opt(0)?;
@@ -547,12 +734,7 @@ pub fn register(router: &mut Router) {
             if let Some(name) = name.map(|n| n.trim().to_owned()).filter(|n| !n.is_empty()) {
                 payload["name"] = json!(name);
             }
-            let created = saved_avatar_write(state, Method::POST, &format!("{AVATAR}/v3/outfits/create"), &payload, "create").await?;
-            if !created.get("id").is_some_and(Value::is_number) {
-                tracing::error!("Avatar: Create saved avatar returned invalid response");
-                return Err(AppError::msg("Failed to create saved avatar"));
-            }
-            Ok(saved_summary(&created, "Untitled Outfit", true))
+            create_saved_avatar(state, &payload).await.map_err(|e| AppError::msg(e.message))
         })
         .handle("avatar:renameSavedAvatar", |ctx, args| async move {
             let id: u64 = args.get(0)?;
@@ -569,30 +751,8 @@ pub fn register(router: &mut Router) {
         })
         .handle("avatar:updateSavedAvatarFromCurrent", |ctx, args| async move {
             let id: u64 = args.get(0)?;
-            let state = &ctx.state;
-            let payload = current_outfit_payload(state).await?;
-            let mut updated = saved_avatar_write(state, Method::PATCH, &format!("{AVATAR}/v3/outfits/{id}"), &payload, "update").await?;
-            if !updated.get("id").is_some_and(Value::is_number) {
-                return Err(AppError::msg("Failed to update saved avatar"));
-            }
-            let missing = updated.get("name").and_then(Value::as_str).is_none_or(str::is_empty)
-                || updated.get("isEditable").is_none()
-                || updated.get("outfitType").is_none();
-            if missing {
-                match state.roblox.get::<Value>(&format!("{AVATAR}/v3/outfits/{id}/details")).await {
-                    Ok(details) => {
-                        for key in ["name", "isEditable", "outfitType"] {
-                            if updated.get(key).is_none_or(|v| v.is_null() || v.as_str() == Some("")) {
-                                if let Some(v) = details.get(key) {
-                                    updated[key] = v.clone();
-                                }
-                            }
-                        }
-                    }
-                    Err(error) => tracing::warn!("Avatar: Failed to fetch outfit details after update: {error}"),
-                }
-            }
-            Ok(saved_summary(&updated, "Untitled Outfit", true))
+            let payload = current_outfit_payload(&ctx.state).await?;
+            update_saved_avatar(&ctx.state, id, &payload).await.map_err(|e| AppError::msg(e.message))
         })
         .handle("avatar:deleteSavedAvatar", |ctx, args| async move {
             let id: u64 = args.get(0)?;

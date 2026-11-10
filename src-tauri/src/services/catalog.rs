@@ -1,8 +1,7 @@
 //! Avatar marketplace (`catalog:*`, `cart:*`). Port of `CatalogService`,
 //! `CatalogItemDetailsFetcher`, `ItemDetailsCacheService` and `CartService`.
 //!
-//! Pending: `purchaseItem`, `checkoutCart` (Robux purchases) and
-//! `getBundleContents` (needs the avatar service).
+//! Pending: `purchaseItem`, `checkoutCart` (Robux purchases).
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
@@ -53,7 +52,7 @@ pub struct ItemRef {
 }
 
 impl ItemRef {
-    fn key(&self) -> String {
+    pub fn key(&self) -> String {
         format!("{}:{}", self.item_type, self.id)
     }
     fn is_bundle(&self) -> bool {
@@ -509,14 +508,14 @@ enum Lookup {
 }
 
 /// `fetchItemDetailsBase`: one item, distinguishing "gone" from "failed".
-async fn item_details_base(state: &AppState, item: &ItemRef) -> Lookup {
+async fn item_details_base(state: &AppState, item: &ItemRef, cookie: Option<&str>) -> Lookup {
     let url = format!(
         "{}/catalog/items/{}/details?itemType={}",
         endpoints::CATALOG_V1,
         item.id,
         item.item_type
     );
-    let response = match state.roblox.get_raw(&url).await {
+    let response = match state.roblox.request_for(reqwest::Method::GET, &url, None, cookie).await {
         Ok(response) => response,
         Err(error) => {
             tracing::warn!(%error, "Failed to fetch catalog item details");
@@ -577,7 +576,7 @@ async fn collectible_details(state: &AppState, ids: Vec<String>) -> Option<HashM
 }
 
 async fn item_details(state: &AppState, item: ItemRef) -> Option<Value> {
-    let Lookup::Found(found) = item_details_base(state, &item).await else {
+    let Lookup::Found(found) = item_details_base(state, &item, None).await else {
         return None;
     };
     let Some(collectible) = found
@@ -593,49 +592,178 @@ async fn item_details(state: &AppState, item: ItemRef) -> Option<Value> {
 
 /// `getItemsDetailsRich`: up to 30 unique items, 4 at a time.
 async fn items_details_rich(state: &AppState, items: Vec<ItemRef>) -> Vec<Value> {
+    lookup_items_details_rich(state, items, None).await.0
+}
+
+/// `lookupItemsDetailsRich`: the resolved details plus the refs Roblox
+/// reported as gone, acting as `as_user` (a stored account) when given.
+pub async fn lookup_items_details_rich(state: &AppState, items: Vec<ItemRef>, as_user: Option<u64>) -> (Vec<Value>, Vec<ItemRef>) {
     let mut seen = HashSet::new();
-    let refs: Vec<ItemRef> = items
-        .into_iter()
-        .filter(|i| seen.insert(i.key()))
-        .take(RICH_DETAILS_MAX_ITEMS)
-        .collect();
+    let refs: Vec<ItemRef> = items.into_iter().filter(|i| seen.insert(i.key())).take(RICH_DETAILS_MAX_ITEMS).collect();
     if refs.is_empty() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     let user_id = state.auth.current_user_id();
+    let scoped = as_user.filter(|u| Some(*u) != user_id);
+    if let Some(user) = scoped {
+        if state.auth.request_cookie_for_user(user).is_none() {
+            tracing::warn!("No stored session for account {user}; skipping its item details");
+            return (Vec::new(), Vec::new());
+        }
+    }
     let mut details = Vec::new();
+    let mut not_found = Vec::new();
     for chunk in refs.chunks(RICH_DETAILS_CONCURRENCY) {
-        for lookup in join_all(chunk.iter().map(|r| item_details_base(state, r))).await {
-            if let Lookup::Found(item) = lookup {
-                details.push(item);
+        let lookups = join_all(chunk.iter().map(|r| async move {
+            match scoped {
+                Some(user) => match state.auth.request_cookie_for_user(user) {
+                    Some(cookie) => item_details_base(state, r, Some(&cookie)).await,
+                    None => Lookup::Failed,
+                },
+                None => item_details_base(state, r, None).await,
+            }
+        }))
+        .await;
+        for (r, lookup) in chunk.iter().zip(lookups) {
+            match lookup {
+                Lookup::Found(item) => details.push(item),
+                Lookup::NotFound => not_found.push(r.clone()),
+                Lookup::Failed => {}
             }
         }
     }
-    let ids = details
-        .iter()
-        .filter_map(|d| {
-            d.get("collectibleItemId")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        })
-        .collect();
+    let ids = details.iter().filter_map(|d| d.get("collectibleItemId").and_then(Value::as_str).map(str::to_owned)).collect();
     let collectibles = collectible_details(state, ids).await;
-    if state.auth.current_user_id() != user_id {
+    if scoped.is_none() && state.auth.current_user_id() != user_id {
         tracing::warn!("Account changed while fetching rich item details; discarding them");
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
-    match collectibles {
-        Some(c) => details
-            .into_iter()
-            .map(|d| apply_collectible(d, Some(&c)))
-            .collect(),
-        None => details
-            .into_iter()
-            .filter(|d| d.get("collectibleItemId").is_none_or(Value::is_null))
-            .collect(),
-    }
+    let resolved = match collectibles {
+        Some(c) => details.into_iter().map(|d| apply_collectible(d, Some(&c))).collect(),
+        None => details.into_iter().filter(|d| d.get("collectibleItemId").is_none_or(Value::is_null)).collect(),
+    };
+    (resolved, not_found)
 }
 
+const BODY_PART_TYPES: [u64; 7] = [17, 27, 28, 29, 30, 31, 79];
+
+fn has_body_parts(assets: &[Value]) -> bool {
+    assets.iter().any(|a| a.pointer("/assetType/id").and_then(Value::as_u64).is_some_and(|t| BODY_PART_TYPES.contains(&t)))
+}
+
+/// `getBundleContents`: a bundle expanded into typed assets; a character
+/// bundle's saved outfit also yields its scales and rig.
+pub async fn bundle_contents(state: &AppState, bundle_id: u64) -> Option<Value> {
+    let url = format!("{}/bundles/{bundle_id}/details", endpoints::CATALOG_V1);
+    let details: Value = match state.roblox.get(&url).await {
+        Ok(d) => d,
+        Err(error) => {
+            tracing::warn!("Failed to fetch bundle contents: {error}");
+            return None;
+        }
+    };
+    let name = details.get("name").and_then(Value::as_str).unwrap_or("").to_owned();
+    let members: Vec<Value> = details.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+    let outfit = members
+        .iter()
+        .find(|m| m.get("type").and_then(Value::as_str) == Some("UserOutfit"))
+        .and_then(|m| m.get("id"))
+        .and_then(Value::as_u64);
+    if let Some(outfit) = outfit {
+        if let Some(contents) = outfit_bundle_contents(state, bundle_id, &name, outfit).await {
+            return Some(contents);
+        }
+    }
+    asset_bundle_contents(state, bundle_id, &name, &members).await
+}
+
+async fn outfit_bundle_contents(state: &AppState, bundle_id: u64, name: &str, outfit: u64) -> Option<Value> {
+    let details: Value = match state.roblox.get(&format!("https://avatar.roblox.com/v3/outfits/{outfit}/details")).await {
+        Ok(d) => d,
+        Err(error) => {
+            tracing::warn!("Failed to read bundle outfit details, falling back to members: {error}");
+            return None;
+        }
+    };
+    let raw_assets = details.get("assets").and_then(Value::as_array).filter(|a| !a.is_empty())?;
+    let assets: Vec<Value> = raw_assets
+        .iter()
+        .map(|a| {
+            let type_id = a.pointer("/assetType/id").cloned().filter(|v| !v.is_null()).unwrap_or(json!(0));
+            let type_name = a.pointer("/assetType/name").and_then(Value::as_str).unwrap_or("");
+            let mut asset = json!({
+                "id": a.get("id"),
+                "name": a.get("name").and_then(Value::as_str).unwrap_or(name),
+                "assetType": { "id": type_id, "name": type_name },
+            });
+            if let Some(meta) = a.get("meta").filter(|m| !m.is_null()) {
+                asset["meta"] = meta.clone();
+            }
+            asset
+        })
+        .collect();
+    let character = has_body_parts(&assets);
+    let mut contents = json!({ "assets": assets, "bundleId": bundle_id, "name": name, "isCharacterBundle": character, "unresolvedAssetIds": [] });
+    match details.get("playerAvatarType").and_then(Value::as_str) {
+        Some("R6") => contents["playerAvatarType"] = json!(1),
+        Some("R15") => contents["playerAvatarType"] = json!(3),
+        _ => {}
+    }
+    if let Some(scale) = details.get("scale").and_then(Value::as_object) {
+        let mut scales = Map::new();
+        for key in ["height", "width", "head", "depth", "proportion", "bodyType"] {
+            if let Some(v) = scale.get(key).filter(|v| !v.is_null()) {
+                scales.insert(key.into(), v.clone());
+            }
+        }
+        if !scales.is_empty() {
+            contents["scales"] = Value::Object(scales);
+        }
+    }
+    Some(contents)
+}
+
+async fn asset_bundle_contents(state: &AppState, bundle_id: u64, name: &str, members: &[Value]) -> Option<Value> {
+    let asset_members: Vec<&Value> = members.iter().filter(|m| m.get("type").and_then(Value::as_str) == Some("Asset")).collect();
+    let missing: Vec<ItemRef> = asset_members
+        .iter()
+        .filter(|m| m.get("assetType").is_none_or(Value::is_null))
+        .filter_map(|m| m.get("id").and_then(Value::as_u64))
+        .map(|id| ItemRef { id, item_type: "Asset".into() })
+        .collect();
+    let mut resolved: HashMap<u64, Value> = HashMap::new();
+    if !missing.is_empty() {
+        match items_details(state, &missing, true).await {
+            Ok(details) => {
+                for d in details {
+                    if let Some(id) = d.get("id").and_then(Value::as_u64) {
+                        resolved.insert(id, d);
+                    }
+                }
+            }
+            Err(error) => {
+                tracing::warn!("Failed to fetch bundle contents: {error}");
+                return None;
+            }
+        }
+    }
+    let mut assets = Vec::new();
+    let mut unresolved = Vec::new();
+    for m in asset_members {
+        let id = m.get("id").cloned().unwrap_or(Value::Null);
+        let type_id = m.get("assetType").filter(|t| !t.is_null()).cloned().or_else(|| {
+            id.as_u64().and_then(|i| resolved.get(&i)).and_then(|d| d.get("assetType")).filter(|t| !t.is_null()).cloned()
+        });
+        let Some(type_id) = type_id else {
+            unresolved.push(id);
+            continue;
+        };
+        let member_name = m.get("name").and_then(Value::as_str).unwrap_or(name);
+        assets.push(json!({ "id": id, "name": member_name, "assetType": { "id": type_id, "name": "" } }));
+    }
+    let character = has_body_parts(&assets);
+    Some(json!({ "assets": assets, "bundleId": bundle_id, "isCharacterBundle": character, "name": name, "unresolvedAssetIds": unresolved }))
+}
 async fn item_thumbnails(
     ctx: &Ctx,
     items: Vec<ItemRef>,
@@ -966,6 +1094,10 @@ pub fn register(router: &mut Router) {
         .handle("catalog:getItemsDetailsRich", |ctx, args| async move {
             let items: Vec<ItemRef> = args.get(0)?;
             Ok(items_details_rich(&ctx.state, items).await)
+        })
+        .handle("catalog:getBundleContents", |ctx, args| async move {
+            let id: u64 = args.get(0)?;
+            Ok(bundle_contents(&ctx.state, id).await)
         })
         .handle("catalog:getItemThumbnails", |ctx, args| async move {
             let items: Vec<ItemRef> = args.get(0)?;

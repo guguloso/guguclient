@@ -75,6 +75,7 @@ pub fn run() {
                 // `before-quit`: persist debounced caches.
                 if let Some(state) = app.try_state::<Arc<AppState>>() {
                     state.social.stop();
+                    crate::services::game_avatar::stop(&state);
                     state.game_communities.flush(&state);
                 }
             }

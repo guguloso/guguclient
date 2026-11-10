@@ -17,6 +17,7 @@ use tauri::{Manager, WebviewWindow};
 
 use crate::error::AppError;
 use crate::ipc::Router;
+use crate::services::game_avatar;
 use crate::services::instances::{self, product_of, version_hash_of, Instance};
 use crate::services::roblox_layout::{
     self as layout, ensure_instance_data_dir, is_version_installed, matches_process_name,
@@ -61,6 +62,7 @@ impl From<AppError> for LaunchError {
 type LaunchResult<T> = Result<T, LaunchError>;
 
 struct Running {
+    avatar: Option<Arc<game_avatar::LaunchAvatar>>,
     pid: Option<u32>,
     place_id: Option<u64>,
     product: String,
@@ -145,6 +147,11 @@ fn find_product_pids(products: &[&str]) -> Vec<(u32, &'static str)> {
                 .map(|n| (p.pid, *n))
         })
         .collect()
+}
+
+/// `isAnyRobloxProcessRunning`.
+pub fn is_any_roblox_running(state: &AppState) -> bool {
+    !state.launch.running.lock().is_empty() || !find_product_pids(&PRODUCTS).is_empty()
 }
 
 fn untracked_player_pids(state: &AppState) -> Vec<u32> {
@@ -863,6 +870,9 @@ fn handle_exit(state: &AppState, id: &str, code: Option<i32>) {
     let Some(running) = state.launch.running.lock().remove(id) else {
         return;
     };
+    if let Some(avatar) = &running.avatar {
+        avatar.release(state);
+    }
     instances::mark_stopped(state, id);
     {
         let mut registry = state.launch.registry.lock();
@@ -938,16 +948,40 @@ async fn launch_instance(
         .as_ref()
         .and_then(|o| o.get("placeId"))
         .and_then(Value::as_u64);
-    if instance.get("launchAvatar").is_some_and(Value::is_object) {
-        tracing::warn!("Launch avatars are not available in the Rust build yet; launching with the account avatar");
+    let avatar = game_avatar::prepare_for_launch(state, &instance, place_id);
+    let result = prepare_and_spawn(state, id, &instance, options.as_ref(), &auth, place_id, avatar.clone()).await;
+    if let Err(error) = result {
+        if let Some(avatar) = &avatar {
+            avatar.release(state);
+        }
+        return Err(error);
     }
+    if state.settings.get_bool("close-on-launch") {
+        if let Some(window) = state.app.get_webview_window(crate::MAIN_WINDOW) {
+            let _ = window.close();
+        }
+    }
+    Ok(())
+}
 
+/// `prepareAndSpawn`: runtime, version and auth, the launch avatar, then the process.
+async fn prepare_and_spawn(
+    state: &Arc<AppState>,
+    id: &str,
+    instance: &Instance,
+    options: Option<&Value>,
+    auth: &AuthContext,
+    place_id: Option<u64>,
+    avatar: Option<Arc<game_avatar::LaunchAvatar>>,
+) -> LaunchResult<()> {
+    let base = state.paths.base.clone();
+    let product = product_of(instance).to_owned();
     ensure_stopped(state, id).await;
-    let target = validate_target(state, &instance)?;
-    if let Err(error) = apply_fast_flags(&instance, &target.client_settings_dir) {
+    let target = validate_target(state, instance)?;
+    if let Err(error) = apply_fast_flags(instance, &target.client_settings_dir) {
         return Err(LaunchError::unknown(error));
     }
-    apply_app_storage_overrides(state, &instance);
+    apply_app_storage_overrides(state, instance);
 
     let mut env: Vec<(String, String)> = Vec::new();
     if instance
@@ -962,11 +996,14 @@ async fn launch_instance(
         env.push(("TMPDIR".into(), tmp));
         tracing::info!(
             "Launching instance '{}' with HOME={}",
-            instance_name(&instance),
+            instance_name(instance),
             fake_home.display()
         );
     }
-    let launch_url = build_launch_url(state, &instance, options.as_ref(), &auth).await?;
+    let launch_url = build_launch_url(state, instance, options, auth).await?;
+    if let Some(avatar) = &avatar {
+        avatar.ready().await;
+    }
 
     let single = closes_other_players(state, &product);
     let spawn = || async {
@@ -1017,6 +1054,7 @@ async fn launch_instance(
         state.launch.running.lock().insert(
             id.to_owned(),
             Running {
+                avatar: avatar.clone(),
                 pid: Some(pid),
                 place_id,
                 product: product.clone(),
@@ -1032,12 +1070,6 @@ async fn launch_instance(
         spawn().await?;
     } else {
         spawn().await?;
-    }
-
-    if state.settings.get_bool("close-on-launch") {
-        if let Some(window) = state.app.get_webview_window(crate::MAIN_WINDOW) {
-            let _ = window.close();
-        }
     }
     Ok(())
 }
