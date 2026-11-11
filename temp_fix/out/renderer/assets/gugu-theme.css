@@ -434,7 +434,13 @@ button, [role="button"] {
    ========================================================================== */
 
 /* ---------- Ambient backdrop: featured art, heavily blurred ------------- */
-.gugu-shell { position: relative; isolation: isolate; }
+/* `clip`, not `hidden`: the ambient layer below bleeds 12% past the shell,
+   and a hidden-overflow box stays programmatically scrollable, so any
+   scrollIntoView (chat jumping to the latest message) shoved the whole UI up. */
+.gugu-shell { position: relative; isolation: isolate; overflow: clip !important; }
+/* Dialog bodies scroll when their content outgrows them (the profile's
+   Wearing tab: the 384px 3D viewer card was clipped at 1400x800). */
+[role=dialog] > div.flex.min-h-0.flex-1.flex-col.overflow-hidden { overflow-y: auto !important; }
 .gugu-shell::before {
   content: "";
   position: absolute;
