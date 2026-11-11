@@ -67,6 +67,12 @@ pub struct CatalogState {
     item_details: Mutex<HashMap<String, (Instant, Value)>>,
 }
 
+impl CatalogState {
+    pub fn clear_cache(&self) {
+        self.item_details.lock().clear();
+    }
+}
+
 // ------------------------------------------------------------------ mapping
 
 fn enum_names(raw: Option<&Value>, names: &[(u64, &str)]) -> Value {

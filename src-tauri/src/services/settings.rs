@@ -170,6 +170,7 @@ fn after_set(state: &Arc<AppState>, id: &str, value: &Value, previous: &Value) {
             let state = Arc::clone(state);
             tauri::async_runtime::spawn(async move { crate::services::protocol::sync_handlers(&state).await });
         }
+        "language" if changed => state.apply_language(value.as_str().unwrap_or("system")),
         "mission-control-hotkey" => crate::services::mission_control::sync_hotkey(state),
         "open-on-startup" if changed => sync_open_on_startup(value.as_bool().unwrap_or(false)),
         id if id.starts_with("captures-") => crate::services::captures::broadcast_status(state),

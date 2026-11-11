@@ -88,6 +88,13 @@ pub struct GameListsState {
     social_links: Mutex<HashMap<u64, (Instant, Value)>>,
 }
 
+impl GameListsState {
+    pub fn clear_cache(&self) {
+        *self.sorts.lock() = None;
+        self.sort_content.lock().clear();
+    }
+}
+
 fn session_id(ctx: &Ctx) -> String {
     ctx.state
         .game_lists

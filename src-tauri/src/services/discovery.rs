@@ -281,6 +281,10 @@ fn friend_weight(status: &str) -> u8 {
 // ----------------------------------------------------------------- service
 
 impl DiscoveryState {
+    pub fn clear_cache(&self) {
+        self.cache.lock().clear();
+    }
+
     fn session_id(&self, reset: bool) -> String {
         let mut slot = self.session_id.lock();
         if reset || slot.is_none() {
@@ -633,7 +637,7 @@ fn is_continue_section(section: &Value) -> bool {
     .to_lowercase();
     haystack
         .split(|c: char| !c.is_alphanumeric())
-        .any(|word| word == "continue")
+        .any(|word| matches!(word, "continue" | "continuar" | "100000003"))
 }
 
 pub fn register(router: &mut Router) {

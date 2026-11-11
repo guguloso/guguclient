@@ -3685,7 +3685,7 @@ const events = { "detail": { "about": "About", "back": "Back", "close": "Close",
 const gameLaunch = { "about": { "created": "Created", "macrosProhibited": "Macros prohibited", "macrosProhibitedBody": "Macros are not allowed in this game.", "maxPlayers": "Max Players", "noDescription": "No description available.", "serverSize": "Server Size", "serverSizeValue": "{{count}} Players", "title": "About", "updated": "Updated" }, "actions": { "addFavoriteTooltip": "Add to favorites", "dislike": "Dislike", "favorite": "Favorite", "favorited": "Favorited", "like": "Like", "notify": "Notify", "notifyOffTooltip": "Turn off update notifications", "notifyOnTooltip": "Get notified about updates", "notifying": "Notifying", "removeFavoriteTooltip": "Remove from favorites", "votePlayFirst": "Play the game first to vote", "voteSessionPending": "Voting unlocks once your session is registered", "voteUnavailable": "Voting isn't available for this game" }, "blocked": { "getAccess": "Get access on Roblox", "paidAccess": "This experience requires paid access." }, "buyFor": "Buy for", "events": { "title": "Events" }, "hero": { "gameIconAlt": "Game Icon", "unknownCreator": "Unknown Creator" }, "instances": { "automatic": "Automatic", "chooseInstance": "Choose an instance", "createAndLaunch": "Create & Launch", "defaultBadge": "Default", "defaultInstance": "Default instance", "manage": "Manage Instances", "playWith": "Play with", "running": "Running", "settingUp": "Setting up..." }, "quickLaunch": { "getAccess": "Get access", "launching": "Launching...", "play": "Play" }, "srDescription": "View game details and launch with an instance", "stats": { "active": "Active", "favorites": "Favorites", "rating": "Rating", "visits": "Visits" }, "tabs": { "about": "About", "macros": "Macros", "servers": "Servers" }, "title": "{{name}} Details" };
 const gameMenu = { "autoLaunchFailedBody": "Please try again later.", "autoLaunchFailedTitle": "Couldn't set auto-launch", "autoLaunchSetBody": "{{instance}} will now launch into {{game}}.", "autoLaunchSetTitle": "Auto-launch set", "dislike": "Dislike", "favorite": "Favorite", "launch": "Launch", "like": "Like", "loading": "Loading…", "noInstances": "No player instances available", "noLinks": "No links", "notify": "Notify", "openLinks": "Open links", "ratePlayFirst": "Play this experience once to rate it", "rateUnavailable": "Rating isn't available for this experience", "removeFavorite": "Remove favorite", "setAutoLaunch": "Set as auto-launch for", "stopNotifying": "Stop notifying", "toasts": { "disliked": "Disliked", "liked": "Liked", "notificationsOff": "Notifications off", "notificationsOn": "Notifications on", "ratingRemoved": "Rating removed" }, "viewAuthor": "View author", "viewAuthorNamed": "View {{name}}", "viewInfo": "View info", "viewServers": "View servers" };
 const games = /* @__PURE__ */ JSON.parse(`{"browser":{"loginToSee":"Login to see your {{label}}","loggedOut":{"favorites":"favorite games","friends":"friends' activity","recent":"recently played games"}},"card":{"byCreator":"by {{name}}","sponsored":"Sponsored"},"categories":{"charts":{"description":"Top experiences right now","label":"Charts"},"favorites":{"description":"Games you've saved","label":"Favorites"},"friends":{"description":"What friends are playing","label":"Friends"},"recent":{"description":"Games you've recently played","label":"Recent"}},"genres":{"action":"Action-packed","adventure":"Explore & adventure","entertainment":"Shows & entertainment","obbyAndPlatformer":"Obbies & platformers","partyAndCasual":"Party & casual","puzzle":"Brain teasers","roleplayAndAvatarSim":"Roleplay & avatar sims","rpg":"Role-playing worlds","shooter":"Shooters & combat","shopping":"Shopping & fashion","simulation":"Simulators & tycoons","sportsAndRacing":"Sports & racing","strategy":"Strategy & tactics","survival":"Survival challenges"},"grid":{"noFavorites":"No favorite games yet","noFriendsPlaying":"No friends currently playing","noGames":"No games found","playing":"Playing {{location}}"},"joinLink":{"cancel":"Cancel","description":"Paste a Roblox server link, deep link, or private server invitation","errors":{"failed":"Failed to resolve game. Check the link and try again.","parse":"Could not parse link. Paste a Roblox game or server URL.","resolve":"Could not resolve game. Check the link and try again."},"fallbackGameName":"Game","join":"Join","placeholder":"https://www.roblox.com/games/... or roblox://...","resolving":"Resolving...","title":"Join via Link"},"macros":{"actionCount_one":"{{count}} action","actionCount_other":"{{count}} actions","actionParams":{"clicksPlaceholder":"clicks"},"actionRow":{"drag":"Drag action","duplicate":"Duplicate this action","remove":"Remove this action","typeStringPlaceholder":"Text to type"},"actionTypes":{"delay":"Delay","holdKey":"Hold key","keyDown":"Key down","keyTap":"Key tap","keyUp":"Key up","mouseClick":"Mouse click","mouseDown":"Mouse down","mouseUp":"Mouse up","randomDelay":"Random delay","scroll":"Scroll","typeString":"Type text"},"addFromLibrary":"Add from library","controlBar":{"noKey":"no key","stop":"Stop"},"disabledBody":"Your macros are saved and will be back when macros are turned on again. Until then, hotkeys won't fire and macros can't be created or edited.","disabledTitle":"Macros are turned off right now","duplicateName":"{{name}} (copy)","editor":{"body":{"add":"Add action","descriptionLoop":"Runs repeatedly until the macro is toggled off. Leave empty to idle until cancelled (the macro just holds whatever the start block pressed).","descriptionRepeat":"Runs the configured number of times between start and end. Leave empty for a one-shot setup-and-teardown macro.","empty":"No body actions. The macro will run start, then end.","label":"Actions","labelLoop":"Loop body"},"cancel":"Cancel","defaultHotkey":"Default hotkey","defaultHotkeyHint":"Used as the key when you enable this macro in a game. Override it per game from that game's macros panel.","delete":"Delete","deniedTooltip":"Macros are disabled for this game by Gugu policy.","end":{"add":"Add end action","description":"Runs once after the body finishes, including when the macro is cancelled. Pair with start actions to release inputs (e.g. mouse-up).","empty":"No end actions. Leave empty to skip the end phase.","label":"End actions"},"loopHint":"Press the hotkey to start, press again to stop. Repeat count is ignored.","loopLabel":"Loop until toggled off","name":"Name","newMacroName":"New macro","recordingFailed":"Recording failed. Please try again.","recordingStartFailed":"Failed to start recording. Please try again.","recordingUnavailable":"Macros are currently turned off.","repeat":"Repeat","save":"Save","saveFailed":"Failed to save the macro. Please try again.","saving":"Saving...","start":{"add":"Add start action","description":"Runs once before the body. Useful for pressing-and-holding an input the body keeps depressed (e.g. mouse-down).","empty":"No start actions. Leave empty to skip the start phase.","label":"Start actions"},"untitledName":"Untitled macro"},"emptyLibrary":"Your macro library is empty.","emptyPlace":"No macros are enabled in this game yet.","headerLibrary":"Manage your macro library. Macros only fire while you're in a Roblox game and the Roblox window is focused.","headerPerPlace":"Macros only fire while Roblox is the focused window and you are inside this game.","hotkey":{"clear":"Clear","none":"No hotkey bound","press":"Press a key...","rejected":"\\"{{key}}\\" can't be used as a hotkey"},"import":"Import","importTitle":"Import a macro from a .lrmacro file","library":{"add":"Add","adding":"Adding...","allEnabled":"Every macro in your library is already enabled in this game!","description":"Pick an existing macro to enable in this game.","title":"Enable a macro from your library"},"loading":"Loading...","mouseButtons":{"left":"Left","middle":"Middle","right":"Right"},"newMacro":"New macro","openFolder":"Open folder","openFolderTitle":"Open the macros folder in your file browser","permission":{"body":"macOS needs to allow Gugu Client for Roblox to send keyboard and mouse input. Macros won't run until you grant Accessibility access under","grantAccess":"Grant access","openSettings":"Open System Settings","path":"System Settings > Privacy & Security > Accessibility.","recheck":"Recheck","title":"Accessibility permission required"},"policyBanner":{"allowBody":"You should still be cautious and ensure your macros comply with the game's rules to avoid any potential moderation!","allowTitle":"Macros are allowed in this game","warnBody":"Running automation in some Roblox experiences may violate that game's rules and result in moderation. You are responsible for knowing the rules of any game you run a macro in.","warnTitle":"Use macros at your own risk"},"recorderPermission":{"body":"macOS needs to allow Gugu Client for Roblox to observe keyboard and mouse input before you can record a macro. Grant access under","grantAccess":"Grant access","openSettings":"Open System Settings","path":"System Settings > Privacy & Security > Input Monitoring.","recheck":"Recheck","title":"Input Monitoring permission required"},"recording":{"add_one":"Add {{count}} action","add_other":"Add {{count}} actions","cancel":"Cancel","close":"Close","description":"Recorded input becomes a block you can edit before saving.","discard":"Discard","dropped_one":"Dropped {{count}} action over the limit.","dropped_other":"Dropped {{count}} actions over the limit.","earlier_one":"{{count}} earlier action above","earlier_other":"{{count}} earlier actions above","noActions":"No actions captured.","recordAgain":"Record again","skipped_one":"Skipped {{count}} unsupported input.","skipped_other":"Skipped {{count}} unsupported inputs.","status":{"atLimit":"Reached the {{limit}}-action limit. Add these or stop.","captured_one":"Captured {{count}} action.","captured_other":"Captured {{count}} actions.","capturing":"Recording your input. Press Escape or Stop to finish.","noneCaptured":"No input captured.","starting":"Starting...","waitingForRoblox":"Switch to your Roblox window to start recording."},"stop":"Stop","stopWithCount":"Stop · {{count}}","titles":{"body":"Record into the macro body","end":"Record into the end actions","start":"Record into the start actions"},"waiting":"Waiting for input..."},"recordingBlock":{"collapse":"Collapse recording","drag":"Drag recording","duplicate":"Duplicate this recording","empty":"This recording captured no actions.","expand":"Expand recording","label":"Recording","remove":"Remove this recording","ungroup":"Ungroup","ungroupTitle":"Split this recording into individual editable actions"},"reload":"Reload","reloadTitle":"Reload macros from disk (picks up shared macro files dropped into the macros folder)","row":{"duplicate":"Duplicate this macro (the copy starts with no default hotkey)","edit":"Edit this macro","export":"Export this macro to a .lrmacro file","invalidKey":"Invalid key","remove":"Remove this macro from the current game (it stays in your library).","stop":"Stop this macro"},"runningIndicator":"Macro running","scrollDirections":{"down":"Down","up":"Up"},"toasts":{"addFailed":"Couldn't add macro","duplicateFailed":"Couldn't duplicate macro","exportFailed":"Couldn't export macro","exported":"Macro exported","exportedBody":"Saved to {{path}}","hotkeyFailed":"Couldn't set hotkey","importFailed":"Couldn't import macro","reloaded":"Macros reloaded","reloadedBody":"Your library has been refreshed from disk.","updateFailed":"Couldn't update macro"}},"privateServers":{"cancel":"Cancel","checkingAvailability":"Checking private server availability...","configure":{"addPeople":"Add People","allowJoining":"Allow Joining","allowJoiningHint":"Disabling this makes the private server inaccessible for you and other users you have invited, and invalidates the current link code. You can reactivate it at any time.","errors":{"allowJoining":"Failed to update Allow Joining.","friendsAllowed":"Failed to update Friends Allowed.","load":"Failed to load this private server.","regenerate":"Failed to regenerate the link.","removePlayer":"Failed to remove the player.","rename":"Failed to rename the server.","renew":"Failed to renew the subscription.","subscription":"Failed to update the subscription."},"experience":"Experience","expiredOn":"Expired On","friendsAllowed":"Friends Allowed","invitePickerDescription":"Invite friends or search for players to add to this private server.","none":"None","removePlayer":"Remove player","renew":{"confirm":"Renew","description":"This private server's subscription has expired. Renewing reactivates it right away.","insufficientFunds":"You do not have enough Robux to renew this subscription.","title":"Renew Subscription"},"renewalDate":"Renewal Date","restricted":"Restricted","serverMembers":"Server Members","srDescription":"Manage your private server's settings, members, and join link.","subscriptionPrice":"Subscription Price","subscriptionStatus":"Subscription Status","title":"Configure Private Server","toasts":{"cancelled":"Subscription cancelled","cancelledBody":"This private server stays active until the current period ends.","playersAddedBody_one":"Added {{count}} player to the invite list.","playersAddedBody_other":"Added {{count}} players to the invite list.","playersAdded_one":"Player added","playersAdded_other":"Players added","regenerated":"Join link regenerated","regeneratedBody":"The old link no longer works. Share the new one to invite people.","renewed":"Subscription renewed","renewedAgainBody":"This private server is active again and will renew monthly.","renewedBody":"This private server will keep renewing monthly."}},"create":"Create Private Server","createModal":{"back":"Back","blocked":"You can't create another private server for this experience right now. You may have reached the limit for this experience.","confirmTitle":"Confirm Subscription","continue":"Continue","descriptionGeneric":"Create a private server for this experience.","descriptionNamed":"Create a private server for {{name}}.","errorCreate":"Failed to create the private server.","namePlaceholder":"My private server","subscribe":"Subscribe","toastCreated":"Private server created","toastCreatedBody":"\\"{{name}}\\" is ready to join."},"empty":"No private servers for this experience yet.","errors":{"availability":"Failed to check private server availability.","friendsOnly":"Private servers are unavailable while the game is Friends Only.","insufficientRobux":"You do not have enough Robux to complete this.","invalidLink":"This private server link is invalid or has expired.","notOwner":"You do not own this private server.","priceChanged":"The price changed. Refresh and try again.","rateLimited":"Please wait a few minutes before configuring this server again.","subscriptionExpired":"Renew this server's subscription before configuring it.","tooManyMembers":"Too many players were added to the invite list."},"free":"Free","joinLinkField":{"copy":"Copy link","hide":"Hide link","label":"Private Server Link","regenerate":"Regenerate","reveal":"Reveal link"},"loadFailed":"Failed to load your private servers.","loading":"Loading private servers...","monthlyPrice":"Monthly Price","purchaseOutcomeUnknown":"We couldn't confirm this purchase. Check your private servers before trying again.","retry":"Retry","row":{"fallbackName":"Private server","manage":"Manage"},"server":"Server","serverName":"Server Name","terms":{"link":"Roblox Subscription Terms","renewCharged":"You will be charged now and automatically each month until you cancel.","renewFree":"This server renews monthly at no charge.","renewPrefix":"By clicking Renew, you agree to the","subscribeCharged":"You will be automatically charged each month until you cancel.","subscribePrefix":"By clicking Subscribe, you agree to the"},"unavailable":"Private servers are unavailable for this experience.","unavailablePrice":"Unavailable"},"search":{"joinLinkButton":"Join Link","noResultsBody":"We couldn't find anything for \\"{{query}}\\". Try a different search.","noResultsTitle":"No results found","placeholder":"Search games..."},"servers":{"controls":{"hideFull":"Hide full","instance":"Instance","refresh":"Refresh","sort":"Sort","source":"Source"},"errors":{"loadFailed":"Failed to load servers. Try again.","loginRequired":"Login is required to view this server list.","placeUnresolved":"Game place could not be resolved for this server list.","privateInactive":"This private server is inactive and can't be joined.","selectInstance":"Select an instance before joining a server."},"item":{"fallbackName":"Server {{number}}","full":"Full server","inactive":"Inactive","join":"Join","owner":"Owner: {{name}}","pingMs":"{{ping}}ms"},"list":{"createInstance":"Create an instance to join a server.","empty":"No servers found.","loadMore":"Load More","loading":"Loading..."},"sorts":{"bestPing":"Best ping","leastFull":"Least full","mostPlayers":"Most players"},"sources":{"friends":"Friends","public":"Public"},"tabs":{"private":"Private Servers","public":"Public Servers"}},"sidebar":{"chartsOnly":"These sorts only apply to Charts — switch back to Charts to use them.","searchOnly":"These sorts only apply to Charts — clear the search to use them.","showLess":"Show less","topLists":"Top Lists","trendingGenres":"Trending Genres","viewMore":"View {{count}} more"},"sorts":{"funWithFriends":"Better with friends","learning":"Educational & creative","mostPopular":"All-time favorites","premium":"For Premium members","topEarning":"Top grossing experiences","topPaidAccess":"Premium paid games","topPlayingNow":"Most players online","topRated":"Highest rated by players","topRevisited":"Players keep coming back","topTrending":"Rising fast right now","trendingMusic":"Music-themed hits","trendingNow":"Trending now","upAndComing":"New games gaining traction"},"tile":{"favorite":"Favorite","launch":"Launch","moreActions":"More actions","removeFavorite":"Remove favorite","toasts":{"addedToFavorites":"Added to favorites","removedFromFavorites":"Removed from favorites"},"viewInfo":"View info"}}`);
-const home = { "addFriendCard": { "connect": "Connect", "openPlayerSearch": "Open player search" }, "friendRow": { "badges": "Badges", "communities": "Communities", "copyUsername": "Copy username", "favorites": "Favorites", "inventory": "Inventory", "joinAria": "Join {{name}}", "joinGame": "Join game", "removeFriend": "Remove friend", "sendMessage": "Send a message", "viewProfile": "View profile", "wearing": "Wearing" }, "friendsPanel": { "addFriend": { "label": "Add a friend", "subtitle": "Roblox is better with friends — add your first!" }, "confirmRemove": { "cancel": "Cancel", "confirm": "Remove", "description": "Remove {{name}} from your friends? You can always add them back later.", "title": "Remove friend?" }, "onlineCount_one": "({{count}} online)", "onlineCount_other": "({{count}} online)", "status": { "inStudio": "In Studio", "lastSeen": "Last seen {{time}}", "offline": "Offline", "online": "Online", "playing": "Playing {{game}}", "unknownGame": "a game" }, "title": "Friends", "toasts": { "friendRemoved": { "body": "{{name}} was removed from your friends.", "fallbackBody": "The friend was removed.", "title": "Friend removed" }, "removeFailed": { "body": "Please try again later.", "title": "Couldn't remove friend" }, "usernameCopied": { "body": "@{{username}} was copied to the clipboard.", "title": "Username copied" } }, "viewAll": "View all" }, "sectionHeader": { "browseFavorites": "Browse Favorites", "browseGames": "Browse Games", "learnMore": "Learn more", "visitRecentGames": "Visit Recent Games" }, "state": { "empty": { "description": "Roblox did not return any Home sections for this session.", "title": "Nothing to show yet", "tryAgain": "Try again" }, "error": { "retry": "Retry", "title": "Failed to load Home" } }, "storeCarousel": { "label": "Gugu store highlights", "nextSlide": "Next slide", "pause": "Pause carousel", "previousSlide": "Previous slide", "resume": "Resume carousel", "showSlide": "Show slide {{index}} of {{total}}" }, "welcomeHeader": { "explore": "Explore Gugu", "links": { "viewAllNews": "View all News", "viewChangelog": "View Changelog" }, "welcome": "Welcome back" } };
+const home = { "addFriendCard": { "connect": "Connect", "openPlayerSearch": "Open player search" }, "friendRow": { "badges": "Badges", "communities": "Communities", "copyUsername": "Copy username", "favorites": "Favorites", "inventory": "Inventory", "joinAria": "Join {{name}}", "joinGame": "Join game", "removeFriend": "Remove friend", "sendMessage": "Send a message", "viewProfile": "View profile", "wearing": "Wearing" }, "friendsPanel": { "addFriend": { "label": "Add a friend", "subtitle": "Roblox is better with friends — add your first!" }, "confirmRemove": { "cancel": "Cancel", "confirm": "Remove", "description": "Remove {{name}} from your friends? You can always add them back later.", "title": "Remove friend?" }, "onlineCount_one": "({{count}} online)", "onlineCount_other": "({{count}} online)", "status": { "inStudio": "In Studio", "lastSeen": "Last seen {{time}}", "offline": "Offline", "online": "Online", "playing": "Playing {{game}}", "unknownGame": "a game" }, "title": "Friends", "toasts": { "friendRemoved": { "body": "{{name}} was removed from your friends.", "fallbackBody": "The friend was removed.", "title": "Friend removed" }, "removeFailed": { "body": "Please try again later.", "title": "Couldn't remove friend" }, "usernameCopied": { "body": "@{{username}} was copied to the clipboard.", "title": "Username copied" } }, "viewAll": "View all" }, "hero": { "byCreator": "by {{creator}}", "featured": "Featured", "liked": "{{rating}}% liked", "moreInfo": "More Info", "playing": "{{count}} playing", "rankToday": "#{{rank}} today" }, "sectionDescriptions": { "charts": "The most popular games across Roblox right now.", "continue": "Jump back into the games you've played recently.", "default": "A curated selection of games from Roblox discovery.", "recommended": "Games we think you'd like based on what you play.", "sponsored": "Paid placements from Roblox creators.", "trending": "Games rising fast across Roblox right now." }, "sectionHeader": { "browseFavorites": "Browse Favorites", "browseGames": "Browse Games", "learnMore": "Learn more", "visitRecentGames": "Visit Recent Games" }, "state": { "empty": { "description": "Roblox did not return any Home sections for this session.", "title": "Nothing to show yet", "tryAgain": "Try again" }, "error": { "retry": "Retry", "title": "Failed to load Home" } }, "storeCarousel": { "label": "Gugu store highlights", "nextSlide": "Next slide", "pause": "Pause carousel", "previousSlide": "Previous slide", "resume": "Resume carousel", "showSlide": "Show slide {{index}} of {{total}}" }, "welcomeHeader": { "explore": "Explore Gugu", "links": { "viewAllNews": "View all News", "viewChangelog": "View Changelog" }, "welcome": "Welcome back" } };
 const inbox = { "actions": { "archive": "Archive", "markUnread": "Mark unread" }, "loadMore": "Load more", "loading": "Loading...", "noAnnouncements": "No announcements", "noMessages": "No messages", "tabs": { "announcements": "Announcements", "archive": "Archive", "inbox": "Inbox", "sent": "Sent" }, "title": "Messages" };
 const instances = /* @__PURE__ */ JSON.parse(`{"activity":{"noSessions":"No tracked sessions yet. Play this instance to see history here!","sessionsPlayed":"Sessions Played","totalPlaytime":"Total Playtime"},"autoLaunch":{"clear":"Clear","description":"Automatically join this experience when the instance launches without a specific game.","none":"No auto-launch experience set.","placeId":"Place {{placeId}}","searchError":"Search failed. Try again in a moment.","searchPlaceholder":"Search experiences...","title":"Auto-launch Experience"},"card":{"failedToLaunch":"Failed to launch","failedToStop":"Failed to stop","launch":"Launch","stop":"Stop","studio":"Studio","versionNotInstalled":"Version not installed"},"common":{"autoUpdateEnabled":"Auto-update enabled","cancel":"Cancel","createInstance":"Create Instance","current":"Current","description":"Description","duplicate":"Duplicate","name":"Name","openMissionControl":"Open Mission Control","optionalDescriptionPlaceholder":"Optional description...","refresh":"Refresh","saved":"Saved","saving":"Saving...","selectVersionPlaceholder":"Select a version","selectedVersionNotFound":"Selected version not found"},"fastFlags":{"activeCount":"{{count}} active","allowlist":{"body":"Roblox has an allowlist that blocks many FFlags. FPS-related flags (Target FPS, VSync Fix) are confirmed working. Some debug flags may be blocked. Look for the","or":"or","suffix":"icons to see flag status.","title":"FastFlags Allowlist"},"categories":{"audio":"Audio","debug":"Debug","experimental":"Experimental","graphics":"Graphics","network":"Network","other":"Other","performance":"Performance","physics":"Physics","ui":"User Interface"},"clearAll":"Clear All","clearAllDialog":{"description":"Clear all FastFlags? This cannot be undone.","title":"Clear All FastFlags"},"customUnknownFlags":"Custom / Unknown Flags","db":{"DFFlagDebugRenderForceTechnologyVoxel":{"description":"Forces the use of Voxel lighting technology instead of ShadowMap or Future.","label":"Force Voxel Lighting"},"DFFlagDisableDPIScale":{"description":"Prevents Roblox from reducing its rendering resolution on high-DPI displays when Windows display scaling is above 100%. Preserves render quality at the cost of higher GPU load on scaled displays.","label":"Disable DPI Scaling"},"DFFlagTextureQualityOverrideEnabled":{"description":"Must be enabled (set to true) to activate the DFIntTextureQualityOverride flag. Without this, the texture quality level override has no effect.","label":"Enable Texture Quality Override"},"DFIntAudioMaxOpenStreams":{"description":"Maximum number of simultaneous audio streams. Lower values may improve performance.","label":"Max Audio Streams"},"DFIntCSGLevelOfDetailSwitchingDistance":{"description":"Controls the distance at which CSG (Constructive Solid Geometry) meshes (including trees, custom parts, and detailed models) switch to lower detail levels. Lower values reduce detail sooner for better performance. Setting too low (e.g. 0) can cause meshes to appear squished or invisible up close.","label":"CSG LOD Switching Distance","options":{"balanced":"Balanced (150)","default":"Default (250)","high":"High (500)","potato":"Potato (50)"}},"DFIntCSGLevelOfDetailSwitchingDistanceL12":{"description":"Distance threshold at which CSG meshes switch from LOD level 1 to level 2. Part of Roblox's 4-tier LOD system. Lower = lower-quality meshes will appear closer to the camera.","label":"CSG LOD Distance (Level 1→2)"},"DFIntCSGLevelOfDetailSwitchingDistanceL23":{"description":"Distance threshold at which CSG meshes switch from LOD level 2 to level 3. Should be set larger than the L12 value.","label":"CSG LOD Distance (Level 2→3)"},"DFIntCSGLevelOfDetailSwitchingDistanceL34":{"description":"Distance threshold at which CSG meshes switch from LOD level 3 to the lowest detail level (4). Should be the largest of the four LOD distance values.","label":"CSG LOD Distance (Level 3→4)"},"DFIntCanHideGuiGroupId":{"description":"Group ID whose members can hide core GUI. Set to 0 to disable.","label":"Hide GUI Group ID"},"DFIntConnectionMTUSize":{"description":"Maximum transmission unit size for network packets. Higher may improve throughput, lower may improve stability.","label":"Network MTU Size"},"DFIntDataSenderMaxBandwidthKbps":{"description":"Maximum upload bandwidth in kilobits per second.","label":"Max Upload Bandwidth (Kbps)"},"DFIntDataSenderRate":{"description":"Rate at which data is sent to the server (per second).","label":"Data Send Rate"},"DFIntDebugFPSCounter":{"description":"Type of FPS counter to display. 0 = off, 1 = simple, 2 = detailed. Note: May be blocked by allowlist.","label":"FPS Counter Mode","options":{"detailed":"Detailed","off":"Off","simple":"Simple"},"warning":"This flag is likely blocked by Roblox's FFlag allowlist. Use Shift+F5 in-game instead."},"DFIntDebugFRMQualityLevelOverride":{"description":"Overrides the graphics quality level. 1-21 scale. 0 = auto.","label":"Graphics Quality Override","options":{"auto":"Auto (Default)","high":"15 - High","low":"5 - Low","lowest":"1 - Lowest","maximum":"21 - Maximum","medium":"10 - Medium"}},"DFIntMaxFrameBufferSize":{"description":"Maximum size of the frame buffer. Higher values use more VRAM but can improve smoothness.","label":"Max Frame Buffer Size"},"DFIntPhysicsReceiveNumParallelTasks":{"description":"Number of parallel tasks for physics processing. More = better multi-core usage.","label":"Physics Parallel Tasks"},"DFIntTaskSchedulerTargetFps":{"description":"Sets the target frame rate for the game. Set to 0 for unlimited FPS. Default is 60. This is one of the most commonly used and confirmed working FFlags.","label":"Target FPS","options":{"fps120":"120 FPS","fps144":"144 FPS","fps165":"165 FPS","fps240":"240 FPS","fps60":"60 FPS (Default)","unlimited":"Unlimited"}},"DFIntTextureQualityOverride":{"description":"Overrides texture quality level. Requires DFFlagTextureQualityOverrideEnabled to be set to true. Higher = better quality but more VRAM.","label":"Texture Quality Override","options":{"auto":"Auto (Default)","high":"High","low":"Low","medium":"Medium"}},"FFlagDebugAvatarChatVisualization":{"description":"Enables visualization for avatar chat tracking (experimental).","label":"Avatar Chat Visualization","warning":"Experimental feature - may cause issues."},"FFlagDebugDisableAudioOutput":{"description":"Completely disables all audio output from the game.","label":"Disable Audio Output"},"FFlagDebugDisableRenderThrottling":{"description":"Disables automatic render throttling when the window is not focused.","label":"Disable Render Throttling"},"FFlagDebugDisableTimeoutDisconnect":{"description":"Prevents automatic disconnection due to network timeouts. Useful for debugging.","label":"Disable Timeout Disconnect","warning":"May cause you to stay in broken games."},"FFlagDebugDisplayFPS":{"description":"Shows an FPS counter in the corner of the screen. Note: This flag may be blocked by Roblox's allowlist.","label":"Display FPS Counter","warning":"This flag is likely blocked by Roblox's FFlag allowlist. Use Shift+F5 in-game instead to view FPS."},"FFlagDebugEnableDeveloperMode":{"description":"Enables developer mode features and diagnostics.","label":"Developer Mode"},"FFlagDebugForceFutureIsBrightPhase2":{"description":"Forces the use of Future lighting technology phase 2.","label":"Force Future Lighting Phase 2"},"FFlagDebugForceFutureIsBrightPhase3":{"description":"Forces the latest Future lighting technology with advanced features.","label":"Force Future Lighting Phase 3"},"FFlagDebugGraphicsDisableMetal":{"description":"Disables Metal graphics API on macOS. Forces OpenGL fallback.","label":"Disable Metal Renderer","warning":"May reduce performance on macOS."},"FFlagDebugGraphicsPreferD3D11":{"description":"Forces Roblox to use Direct3D 11 on Windows. Good for compatibility.","label":"Prefer Direct3D 11"},"FFlagDebugGraphicsPreferOpenGL":{"description":"Forces Roblox to use OpenGL instead of other graphics APIs.","label":"Prefer OpenGL Renderer"},"FFlagDebugGraphicsPreferVulkan":{"description":"Forces Roblox to use the Vulkan graphics API when available. Can improve performance on some systems.","label":"Prefer Vulkan Renderer","warning":"May cause crashes on systems without proper Vulkan support."},"FFlagDebugPrintPhysicsErrors":{"description":"Logs physics errors to the output for debugging.","label":"Print Physics Errors"},"FFlagDebugRenderingDiagnostic":{"description":"Shows advanced rendering diagnostic information on screen.","label":"Rendering Diagnostics"},"FFlagDebugSimIntegrationStabilityTracking":{"description":"Enables tracking of physics simulation stability for debugging.","label":"Physics Stability Tracking"},"FFlagDebugSkyGray":{"description":"Replaces the skybox with a solid gray color. Useful for testing or reducing distractions.","label":"Gray Sky"},"FFlagDisableNewIGMinDUA":{"description":"Disables the new in-game menu in Desktop User Acquisition flow.","label":"Disable New IG Menu in DUA"},"FFlagDisablePostFx":{"description":"Disables post-processing effects like bloom, sun rays, and color correction. Can improve FPS.","label":"Disable Post Processing"},"FFlagEnableHapticsInExperiences":{"description":"Enables haptic feedback in supported games and controllers.","label":"Haptic Feedback"},"FFlagEnableInGameMenuV3":{"description":"Enables the redesigned in-game menu (V3).","label":"New In-Game Menu"},"FFlagEnableReportAbuseMenuRoactABTest2":{"description":"Enables the new React-based report abuse menu.","label":"New Report Menu"},"FFlagEnableVoiceDefaultChannel":{"description":"Enables voice chat default channel feature.","label":"Voice Default Channel"},"FFlagFacialAnimationStreaming2":{"description":"Enables streaming of facial animations for avatars.","label":"Facial Animation Streaming"},"FFlagFastGPULightCulling3":{"description":"Enables optimized GPU-based light culling for better performance with many lights.","label":"Fast GPU Light Culling"},"FFlagFixForcingVsyncOff":{"description":"Fixes issues with VSync when using uncapped frame rates. Enable this when using custom FPS caps. Confirmed working.","label":"VSync Fix"},"FFlagGameBasicSettingsFramerateCap":{"description":"Enables the FPS cap option in the in-game settings menu.","label":"In-Game FPS Cap Setting"},"FFlagSelfViewAnimatedWorldActive":{"description":"Enables animated self-view in the game (experimental feature).","label":"Animated Self View"},"FFlagSimDefaultPGSSolver":{"description":"Uses the default PGS (Projected Gauss-Seidel) solver.","label":"Default PGS Solver"},"FFlagVoiceChatEnableMoreMenuEntry":{"description":"Enables the voice chat entry in the more menu.","label":"Voice Chat Menu Entry"},"FIntDebugForceMSAASamples":{"description":"Forces a specific MSAA (Multi-Sample Anti-Aliasing) sample count. Higher values smooth jagged edges at the cost of GPU performance. 0 = disabled, 1 = 1x, 2 = 2x, 4 = 4x.","label":"Force MSAA Samples","options":{"disabled":"Disabled (0x)","x1":"1x","x2":"2x","x4":"4x"}},"FIntFRMMaxGrassDistance":{"description":"Maximum distance from the camera at which grass is rendered. Set to 0 to disable all grass for maximum performance. Higher values render grass further away.","label":"Max Grass Render Distance","options":{"default":"Default (100)","disabled":"Disabled (0)","high":"High (150)","low":"Low (50)"}},"FIntFRMMinGrassDistance":{"description":"Minimum distance from the camera at which grass begins to render. A value of 0 means grass starts directly at the camera position.","label":"Min Grass Render Distance"},"FIntGrassMovementReducedMotionFactor":{"description":"Controls how much grass sway animation is reduced. 0 = full grass movement, 100 = completely static grass. Higher values improve performance by reducing grass simulation work.","label":"Grass Movement Reduced Motion","options":{"full":"Full motion (0)","half":"Half motion (50)","none":"No motion (100)"}},"FIntRenderShadowIntensity":{"description":"Controls the intensity of shadows. 0 = no shadows.","label":"Shadow Intensity"}},"flagValue":"Value: {{value}}","flagsActive_one":"{{count}} flag active","flagsActive_other":"{{count}} flags active","invalidJson":"Invalid JSON","item":{"active":"Active","custom":"Custom...","defaultValue":"Default: {{value}}","removeFlag":"Remove flag","selectPlaceholder":"Select...","valuePlaceholder":"Value"},"json":{"edit":"Edit JSON","error":"Error: {{error}}","hint":"FastFlags are applied when the instance is launched. Changes made here will override the Visual Editor settings.","label":"FastFlags JSON","locked":"JSON editor is locked to prevent accidental edits","save":"Save JSON"},"jsonEditor":"JSON Editor","moreResults":"+ {{count}} more results","noFlagsConfigured":"No flags configured","noFlagsFound":"No flags found matching \\"{{query}}\\"","noFlagsHint":"Use the presets above or enable \\"Show all flags\\" to browse available options","presets":{"balanced":"Balanced","fps120":"FPS 120","fps144":"FPS 144","fps240":"FPS 240","highQuality":"High Quality","performanceMode":"Performance Mode","potato":"Potato (Max FPS)","unlimited":"Unlimited"},"quickPresets":"Quick Presets","saveChanges":"Save Changes","saveFailed":"Save failed","searchPlaceholder":"Search flags...","searchResults":"Search Results ({{count}})","showAllFlags":"Show all flags","status":{"blocked":"This flag is blocked by Roblox's allowlist","likelyBlocked":"This flag is likely blocked by Roblox's allowlist","unknown":"Status unknown - may or may not work","working":"Confirmed working"},"visualEditor":"Visual Editor"},"font":{"appliesNextLaunch":"Font changes apply on the next launch for this instance.","chooseFont":"Choose Font","default":"Default","description":"Replaces the font Roblox uses for all in-game text with a font of your choice.","formatsHint":"Supported formats: .ttf, .otf, .ttc. A custom font takes priority over any font included by mods.","removeFailed":"Failed to remove font.","removeFont":"Remove Font","setFailed":"Failed to set font.","title":"Custom Font"},"fps":{"appliedOnLaunch":"FPS settings are applied when the instance is launched.","apply":"Apply","customFps":"Custom FPS","description":"Limits the frame rate while this instance is running.","fpsValue":"{{fps}} FPS","presets":"Presets","title":"FPS Cap","unlimited":"Unlimited"},"general":{"actions":{"description":"Duplicate, open the instance folder, or open the Mission Control companion window.","openFolder":"Open Folder","openMods":"Open Mods","title":"Actions"},"copyName":"{{name}} (Copy)","dangerZone":{"description":"Deleting an instance removes all of its data and cannot be undone.","title":"Danger Zone"},"deleteDialog":{"confirm":"Delete","description":"Delete instance \\"{{name}}\\"? This cannot be undone."},"deleteInstance":"Delete Instance","details":{"created":"Created","description":"Read-only metadata for this instance.","lastLaunched":"Last Launched","title":"Details"},"duplicateDialog":{"description":"Enter a name for the duplicated instance.","title":"Duplicate Instance"},"launchAccount":{"description":"Pin a specific account to this instance, or use whoever is active at launch time.","missingPinned":"Missing pinned account (ID: {{id}})","missingWarning":"The pinned account is no longer available. Select a different account, or use the active account.","title":"Launch Account","useActive":"Use current account at launch"},"profile":{"description":"Identify this instance with a name, description, and icon.","iconColor":"Icon Color","iconColorOption":"Use icon color {{color}}","title":"Profile"},"saveStatus":{"idle":"Auto-saves on change","saving":"Saving…"}},"list":{"ascending":"Ascending","channels":"Channels","clearAllFilters":"Clear all filters","clearFilters":"Clear filters","createFirstHint":"Create your first instance to get started","customFps":"Custom FPS","descending":"Descending","filters":"Filters","new":"New","noInstancesYet":"No instances yet","noMatches":"No matches found","noMatchesHint":"Try adjusting your search or filters","searchPlaceholder":"Search instances...","selectInstance":"Select an instance","selectInstanceHint":"Click on an instance in the sidebar to view its details","sortBy":"Sort by","toast":{"stopFailedBody":"Please try again later.","stopFailedTitle":"Couldn't stop instance","stoppedBody":"\\"{{name}}\\" was shut down.","stoppedTitle":"Instance stopped"},"yourInstances":"Your Instances"},"mods":{"appliesNextLaunch":"Mod changes apply on the next launch for this instance.","conflictHint":"Conflict behavior: top entries have higher priority and win on file conflicts.","description":"Mods contain assets that override the default game files, such as models, textures, and sounds. They do not modify the game executable and cannot include scripts or code.","empty":{"importHint":"Import a folder or ZIP that contains overlay files under","or":"or","priorityHint":"Top entries are higher priority. Mods closer to the top override mods below them on file conflicts.","title":"No mods added yet"},"errors":{"importError":"Failed to import mod.","importFailed":"Mod import failed.","loadFailed":"Failed to load mods for this instance.","openFolderFailed":"Failed to open mods folder.","refreshFailed":"Failed to refresh mods.","removeFailed":"Failed to remove mod.","reorderFailed":"Failed to reorder mods.","toggleFailed":"Failed to update mod state."},"importFolder":"Import Folder","importZip":"Import ZIP","item":{"disabled":"Disabled","dragAria":"Drag mod {{name}}","filesSummary_one":"{{count}} file • {{size}}","filesSummary_other":"{{count}} files • {{size}}","folder":"Folder","removeAria":"Remove mod {{name}}","zip":"ZIP"},"openModsFolder":"Open Mods Folder","removeDialog":{"confirm":"Remove","descriptionGeneric":"Remove this mod?","descriptionNamed":"Remove mod \\"{{name}}\\" from this instance?","title":"Remove Mod"},"title":"Asset Mods"},"new":{"appType":"App Type","autoUpdateLatest":"Auto-update to latest version","creating":"Creating...","description":"Create a new Roblox instance with custom settings.","downloadLatest":"Download Latest {{product}}","downloadLatestHint":"Download the latest to get started.","downloading":"Downloading...","errors":{"createFailed":"Failed to create instance","downloadFailed":"Download failed","downloadInProgress":"A version download is already in progress.","nameEmpty":"Name cannot be empty","noVersionSelected":"Please download a version before creating an instance."},"namePlaceholder":"My Instance","noVersionsInstalled":"No {{product}} versions installed yet.","robloxPlayer":"Roblox Player","robloxStudio":"Roblox Studio","robloxVersion":"Roblox Version","selectTypePlaceholder":"Select type","startingDownload":"Starting download...","title":"Create New Instance"},"notFound":"Instance not found","settings":{"running":"Running","tabs":{"activity":"Activity","fastFlags":"FastFlags","fps":"FPS","general":"General","mods":"Mods","version":"Version"}},"sort":{"created":"Created","lastPlayed":"Last Played","name":"Name","playCount":"Times Played","playtime":"Playtime"},"version":{"autoUpdateChannel":"Auto-update to latest version of channel","autoUpdateHint":"When enabled, this instance will use the latest version whenever you download an update.","currentDescription":"Active build for this instance.","currentVersion":"Current Version","goToDownloads":"Go to the Downloads tab to install Roblox.","noVersionsInstalled":"No versions installed.","notInstalled":"Not installed","saveFailed":"Failed to save","saveVersion":"Save Version","selectDescription":"Choose any installed build, or enable auto-update to track the channel.","selectVersion":"Select Version"}}`);
 const items = { "picker": { "addNone": "Add items", "add_one": "Add {{count}} item", "add_other": "Add {{count}} items", "added": "Added", "failed": "Gugu Client for Roblox couldn't reach the catalog. Try again.", "hint": "Search by name, or paste asset IDs or roblox.com catalog links.", "noResults": "No items match that search.", "rejected_one": "{{count}} pasted item can't be added here.", "rejected_other": "{{count}} pasted items can't be added here.", "robloxOnly": "Made by Roblox only", "searchPlaceholder": "Search items or paste IDs and links", "searching": "Searching...", "selectionCount": "{{count}} of {{max}} selected" }, "valueDetails": { "cooldownMinutes": "Available in {{minutes}}m", "cooldownSeconds": "Available in {{seconds}}s", "demand": "Demand", "demandLevels": { "amazing": "Amazing", "high": "High", "low": "Low", "normal": "Normal", "terrible": "Terrible" }, "hyped": "Hyped", "projected": "Projected", "rap": "RAP", "rare": "Rare", "refreshAriaLabel": "Refresh Rolimon's data", "refreshTooltip": "Refresh from Rolimon's", "title": "Rolimon's Value", "trend": "Trend", "trendLevels": { "lowering": "Lowering", "rising": "Rising", "stable": "Stable", "unstable": "Unstable" }, "unassigned": "Unassigned", "updated": "Updated {{time}}", "value": "Value" } };
@@ -72032,10 +72032,10 @@ const LOGGED_OUT_CATEGORY_LABEL_KEYS = {
   friends: "games.browser.loggedOut.friends",
   recent: "games.browser.loggedOut.recent"
 };
-const GAMES_SORTS_CACHE_KEY = "games-sorts";
+const getGamesSortsCacheKey = (lang) => `games-sorts:${lang || "en"}`;
 const GAMES_VIEW_CACHE_PREFIX = "games-view:";
 const GAMES_FAVORITES_CACHE_PREFIX = "games-favorites:";
-const TRENDING_LABEL_PREFIX = /^trending in\s+/i;
+const TRENDING_LABEL_PREFIX = /^trending in\s+|^em alta em\s+|^tendencias en\s+/i;
 const partitionGameSorts = (sorts) => {
   const regular = [];
   const trending = [];
@@ -72148,8 +72148,8 @@ const convertRecentGamesToGames = (recentGames) => recentGames.map((game) => ({
   minimumAge: game.minimumAge,
   ageRecommendationDisplayName: game.ageRecommendationDisplayName
 }));
-const getGamesViewCacheKey = (userId, category, sortId) => `${GAMES_VIEW_CACHE_PREFIX}${userId ?? "guest"}:${category}:${sortId}`;
-const getGamesFavoritesCacheKey = (userId) => `${GAMES_FAVORITES_CACHE_PREFIX}${userId ?? "guest"}`;
+const getGamesViewCacheKey = (userId, category, sortId, lang) => `${GAMES_VIEW_CACHE_PREFIX}${userId ?? "guest"}:${category}:${sortId}:${lang || "en"}`;
+const getGamesFavoritesCacheKey = (userId, lang) => `${GAMES_FAVORITES_CACHE_PREFIX}${userId ?? "guest"}:${lang || "en"}`;
 const showsSubscriptionStatus = (subscription) => subscription.price !== 0 || subscription.expired;
 const SubscriptionFields = ({
   disabled,
@@ -73840,6 +73840,7 @@ const useGameInfo = ({
   placeId,
   universeId
 }) => {
+  const { i18n } = useTranslation();
   const [state2, setState] = reactExports.useState(
     INITIAL_GAME_INFO_STATE
   );
@@ -73905,7 +73906,7 @@ const useGameInfo = ({
     return () => {
       cancelled = true;
     };
-  }, [includeWideThumbnail, placeId, universeId]);
+  }, [includeWideThumbnail, placeId, universeId, i18n.language]);
   return state2;
 };
 const DEFAULT_BLOCK_REASON = "This experience can't be launched right now.";
@@ -131533,7 +131534,7 @@ const GamesBrowser = ({
   category,
   sortId
 }) => {
-  const { t: t2 } = useTranslation();
+  const { t: t2, i18n } = useTranslation();
   const { auth } = useAppContext();
   const { user } = auth;
   const navigate = useNavigate();
@@ -131543,10 +131544,11 @@ const GamesBrowser = ({
   const searchQuery = q ?? "";
   const isSearchMode = searchQuery.trim().length > 0;
   const selectedSort = sortId ?? "";
-  const viewCacheKey = getGamesViewCacheKey(user?.id, category, selectedSort);
-  const favoritesCacheKey = getGamesFavoritesCacheKey(user?.id);
+  const sortsCacheKey = getGamesSortsCacheKey(i18n.language);
+  const viewCacheKey = getGamesViewCacheKey(user?.id, category, selectedSort, i18n.language);
+  const favoritesCacheKey = getGamesFavoritesCacheKey(user?.id, i18n.language);
   const [sorts, setSorts] = reactExports.useState(
-    () => readSessionCache(GAMES_SORTS_CACHE_KEY) ?? []
+    () => readSessionCache(sortsCacheKey) ?? []
   );
   const [games2, setGames] = reactExports.useState(
     () => readSessionCache(viewCacheKey)?.games ?? []
@@ -131620,14 +131622,14 @@ const GamesBrowser = ({
   const loadSorts = reactExports.useCallback(async () => {
     try {
       const sortList = await window.api.games.getSorts();
-      writeSessionCache(GAMES_SORTS_CACHE_KEY, sortList);
+      writeSessionCache(sortsCacheKey, sortList);
       setSorts(sortList);
       setSortsError(null);
     } catch (err) {
       console.error("Failed to load sorts:", err);
       setSortsError("Failed to load game charts");
     }
-  }, []);
+  }, [sortsCacheKey]);
   reactExports.useEffect(() => {
     if (category !== "charts" || sorts.length === 0 || !selectedSort || sorts.some((sort) => sort.sortId === selectedSort)) {
       return;
@@ -131665,14 +131667,14 @@ const GamesBrowser = ({
   const loadFavoriteGames = reactExports.useCallback(
     async (userId) => {
       const favs = await window.api.auth.getFavoriteGames(userId);
-      writeSessionCache(getGamesFavoritesCacheKey(userId), favs);
+      writeSessionCache(favoritesCacheKey, favs);
       setFavoriteGames(favs);
       if (favs.length > 0) {
         const universeIds = favs.map((g) => g.id);
         loadGameMetadata(universeIds).catch((err) => console.warn("Failed to load game metadata:", err));
       }
     },
-    [loadGameMetadata]
+    [favoritesCacheKey, loadGameMetadata]
   );
   const loadFriendsGames = reactExports.useCallback(
     async (userId) => {
@@ -131860,23 +131862,26 @@ const GamesBrowser = ({
   const loadedFavoritesForUserRef = reactExports.useRef(null);
   reactExports.useEffect(() => {
     const currentUserId = user?.id ?? null;
-    if (loadedFavoritesForUserRef.current === currentUserId) {
+    const favScopeKey = `${currentUserId}:${i18n.language}`;
+    if (loadedFavoritesForUserRef.current === favScopeKey) {
       return;
     }
-    loadedFavoritesForUserRef.current = currentUserId;
+    loadedFavoritesForUserRef.current = favScopeKey;
     if (currentUserId === null) {
       setFavoriteGames([]);
       return;
     }
     loadFavoriteGames(currentUserId);
-  }, [user?.id, loadFavoriteGames]);
+  }, [user?.id, i18n.language, loadFavoriteGames]);
   const attemptedSortsForCategoryRef = reactExports.useRef(null);
   reactExports.useEffect(() => {
-    if (sorts.length === 0 && attemptedSortsForCategoryRef.current !== category) {
-      attemptedSortsForCategoryRef.current = category;
+    const sortScopeKey = `${category}:${i18n.language}`;
+    const cachedSorts = readSessionCache(sortsCacheKey);
+    if ((sorts.length === 0 || !cachedSorts) && attemptedSortsForCategoryRef.current !== sortScopeKey) {
+      attemptedSortsForCategoryRef.current = sortScopeKey;
       loadSorts();
     }
-  }, [category, loadSorts, sorts.length]);
+  }, [category, i18n.language, loadSorts, sorts.length, sortsCacheKey]);
   reactExports.useEffect(() => {
     loadGames();
   }, [loadGames]);
@@ -136371,12 +136376,12 @@ const MINUTES_PER_HOUR = 60;
 const HOME_COUNTDOWN_HOURS_PLACEHOLDER = "{hours}";
 const HOME_COUNTDOWN_MINUTES_PLACEHOLDER = "{minutes}";
 const CONTINUE_SECTION_PATTERN = /\bcontinu(e|ar)\b|\bjogue de novo\b/i;
-const FAVORITES_SECTION_PATTERN = /favorite/i;
-const TRENDING_TITLE_PATTERN = /trend|hot|rising/;
+const FAVORITES_SECTION_PATTERN = /favorit/i;
+const TRENDING_TITLE_PATTERN = /trend|hot|rising|em alta|tendenc|subiendo/;
 const CHARTS_TITLE_PATTERN = /\btop\b|chart|popular/;
-const RECOMMENDED_TITLE_PATTERN = /recommend|for you|standout/;
-const INSPIRED_BY_SEARCHES_PATTERN = /inspired by your searches/i;
-const RECOMMENDED_ROW_PATTERN = /recommend/i;
+const RECOMMENDED_TITLE_PATTERN = /recommend|recomend|for you|para voc|para ti|standout/;
+const INSPIRED_BY_SEARCHES_PATTERN = /inspired by your searches|inspirad/i;
+const RECOMMENDED_ROW_PATTERN = /recommend|recomend/i;
 const getHomeSectionGridClassName = () => "grid w-full min-w-0 grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4";
 const isContinueHomeSection = (section) => section.kind !== "friends-carousel" && CONTINUE_SECTION_PATTERN.test(`${section.id} ${section.title}`);
 const isFavoritesHomeSection = (section) => section.kind !== "friends-carousel" && FAVORITES_SECTION_PATTERN.test(section.title);
@@ -136416,7 +136421,7 @@ const getHomeSectionIcon = (section) => {
   }
   return PiPlanetRingStroke;
 };
-const getHomeSectionDescription = (section) => {
+const getHomeSectionDescription = (section, t2) => {
   if (section.subtitle) {
     return section.subtitle;
   }
@@ -136427,22 +136432,22 @@ const getHomeSectionDescription = (section) => {
     return;
   }
   if (isContinueHomeSection(section)) {
-    return "Jump back into the games you've played recently.";
+    return t2("home.sectionDescriptions.continue");
   }
   const title = section.title.toLowerCase();
   if (RECOMMENDED_TITLE_PATTERN.test(title)) {
-    return "Games we think you'd like based on what you play.";
+    return t2("home.sectionDescriptions.recommended");
   }
   if (TRENDING_TITLE_PATTERN.test(title)) {
-    return "Games rising fast across Roblox right now.";
+    return t2("home.sectionDescriptions.trending");
   }
   if (CHARTS_TITLE_PATTERN.test(title)) {
-    return "The most popular games across Roblox right now.";
+    return t2("home.sectionDescriptions.charts");
   }
-  if (title.includes("sponsor")) {
-    return "Paid placements from Roblox creators.";
+  if (title.includes("sponsor") || title.includes("patrocin")) {
+    return t2("home.sectionDescriptions.sponsored");
   }
-  return "A curated selection of games from Roblox discovery.";
+  return t2("home.sectionDescriptions.default");
 };
 const getSectionLink = ({
   t: t2,
@@ -136559,7 +136564,7 @@ const HomeSectionHeader = ({
 }) => {
   const { t: t2 } = useTranslation();
   const Icon = getHomeSectionIcon(section);
-  const description = getHomeSectionDescription(section);
+  const description = getHomeSectionDescription(section, t2);
   const isFriends = section.kind === "friends-carousel";
   const isContinue = isContinueHomeSection(section);
   const isFavorites = isFavoritesHomeSection(section);
@@ -137836,7 +137841,7 @@ const HomeWelcomeHeader = ({
     }
   );
 };
-const getHomeFeedCacheKey = (userId) => `home-feed:${userId ?? "guest"}`;
+const getHomeFeedCacheKey = (userId, lang) => `home-feed:${userId ?? "guest"}:${lang || "en"}`;
 const GUGU_HERO_INTERVAL_MS = 8e3;
 const GUGU_HERO_MAX = 6;
 const guguPickHeroGames = (sections) => {
@@ -137862,6 +137867,7 @@ const guguPickHeroGames = (sections) => {
   return out;
 };
 const GuguHomeHero = ({ sections, isLoading }) => {
+  const { t: t2, i18n } = useTranslation();
   const { overlay } = useAppContext();
   const { quickLaunch } = useQuickLaunch();
   const games2 = reactExports.useMemo(() => guguPickHeroGames(sections ?? []), [sections]);
@@ -137896,7 +137902,7 @@ const GuguHomeHero = ({ sections, isLoading }) => {
     return () => {
       cancelled = true;
     };
-  }, [idsKey]);
+  }, [idsKey, i18n.language]);
   reactExports.useEffect(() => {
     if (paused || games2.length < 2) {
       return;
@@ -137945,25 +137951,25 @@ const GuguHomeHero = ({ sections, isLoading }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "gugu-hero-content", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "gugu-hero-eyebrow", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(BrandMark, { "aria-hidden": true, className: "size-4", title: "" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Featured" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "gugu-hero-rank", children: ["#", active + 1, " today"] })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: t2("home.hero.featured") }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "gugu-hero-rank", children: t2("home.hero.rankToday", { rank: active + 1 }) })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "gugu-hero-title", children: game.name }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "gugu-hero-title", children: info?.name || game.name }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "gugu-hero-meta", children: [
-            typeof game.rating === "number" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "gugu-hero-match", children: [game.rating, "% liked"] }) : null,
-            playing > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [formatHomePlayerCount(playing), " playing"] }) : null,
+            typeof game.rating === "number" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "gugu-hero-match", children: t2("home.hero.liked", { rating: game.rating }) }) : null,
+            playing > 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: t2("home.hero.playing", { count: formatHomePlayerCount(playing) }) }) : null,
             genre ? /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "gugu-hero-chip", children: genre }) : null,
-            info?.creator?.name ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: ["by ", info.creator.name] }) : null
+            info?.creator?.name ? /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: t2("home.hero.byCreator", { creator: info.creator.name }) }) : null
           ] }),
           description ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "gugu-hero-desc", children: description }) : null,
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "gugu-hero-actions", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "gugu-btn-play", onClick: () => quickLaunch(target), type: "button", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(PiPlayBigStroke, { className: "size-5" }),
-              "Play"
+              t2("gameLaunch.quickLaunch.play")
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "gugu-btn-info", onClick: () => overlay.openGameLaunch(target), type: "button", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(PiInformationCircleStroke, { className: "size-5" }),
-              "More Info"
+              t2("home.hero.moreInfo")
             ] })
           ] })
         ] }, game.universeId),
@@ -137985,9 +137991,11 @@ const GuguHomeHero = ({ sections, isLoading }) => {
   );
 };
 const HomePage = () => {
+  const { i18n } = useTranslation();
   const { auth } = useAppContext();
   const requestIdRef = reactExports.useRef(0);
-  const cacheKey = getHomeFeedCacheKey(auth.user?.id);
+  const langRef = reactExports.useRef(i18n.language);
+  const cacheKey = getHomeFeedCacheKey(auth.user?.id, i18n.language);
   const [feed, setFeed] = reactExports.useState(
     () => readSessionCache(cacheKey) ?? null
   );
@@ -138042,12 +138050,14 @@ const HomePage = () => {
     if (isGuest) {
       requestIdRef.current += 1;
     }
-    if (readSessionCache(cacheKey) === void 0) {
+    const langChanged = langRef.current !== i18n.language;
+    langRef.current = i18n.language;
+    if (readSessionCache(cacheKey) === void 0 || langChanged) {
       setFeed(null);
     }
     setError(null);
-    loadHomeFeed(cacheKey, false).catch(() => void 0);
-  }, [auth.isAuthLoading, auth.user?.id, cacheKey, loadHomeFeed]);
+    loadHomeFeed(cacheKey, langChanged).catch(() => void 0);
+  }, [auth.isAuthLoading, auth.user?.id, cacheKey, i18n.language, loadHomeFeed]);
   const handleRetry = async () => {
     await loadHomeFeed(cacheKey, true);
   };

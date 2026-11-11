@@ -75,6 +75,7 @@ pub struct RobloxClient {
     http: reqwest::Client,
     cookie: RwLock<Option<Arc<str>>>,
     csrf: RwLock<Option<HeaderValue>>,
+    accept_language: RwLock<HeaderValue>,
     challenge_handler: RwLock<Option<ChallengeHandler>>,
 }
 
@@ -92,8 +93,19 @@ impl RobloxClient {
             http,
             cookie: RwLock::new(None),
             csrf: RwLock::new(None),
+            accept_language: RwLock::new(HeaderValue::from_static("en-US,en;q=0.9")),
             challenge_handler: RwLock::new(None),
         })
+    }
+
+    /// Sets the `Accept-Language` header sent on Roblox API requests.
+    pub fn set_language(&self, lang: &str) {
+        let header = match lang.to_ascii_lowercase().as_str() {
+            l if l.starts_with("pt") => HeaderValue::from_static("pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"),
+            l if l.starts_with("es") => HeaderValue::from_static("es-419,es;q=0.9,en-US;q=0.8,en;q=0.7"),
+            _ => HeaderValue::from_static("en-US,en;q=0.9"),
+        };
+        *self.accept_language.write() = header;
     }
 
     /// Raw client for non-API downloads (thumbnail images, etc.).
@@ -303,7 +315,10 @@ impl RobloxClient {
                 self.csrf.read().clone()
             };
 
-            let mut request = self.http.request(method.clone(), url);
+            let mut request = self
+                .http
+                .request(method.clone(), url)
+                .header("Accept-Language", self.accept_language.read().clone());
             if let Auth::Web { tracker, .. } = auth {
                 request = request
                     .header("Origin", endpoints::WEB)

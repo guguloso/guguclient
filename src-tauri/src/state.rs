@@ -79,8 +79,17 @@ impl AppState {
 
         let events = EventBus::new(app.clone());
         let cache = CacheService::open(&paths)?;
+        let settings = SettingsService::open(&paths)?;
+        let lang = Self::resolve_effective_language(
+            settings
+                .get("language")
+                .as_ref()
+                .and_then(Value::as_str)
+                .unwrap_or("system"),
+        );
+        roblox.set_language(&lang);
         Ok(Self {
-            settings: SettingsService::open(&paths)?,
+            settings,
             feature_flags: FeatureFlagService::initialize(&cache),
             cache,
             auth: AuthService::load(
@@ -142,7 +151,32 @@ impl AppState {
     /// Analytics collection is disabled; kept as a no-op for existing call sites.
     pub fn track(&self, _event: &str, _payload: Value) {}
 
-    /// Background services, in the Electron boot order (after auth).
+    /// Updates Roblox API `Accept-Language` and clears localized caches.
+    pub fn apply_language(&self, setting: &str) {
+        let lang = Self::resolve_effective_language(setting);
+        self.roblox.set_language(&lang);
+        self.discovery.clear_cache();
+        self.game_lists.clear_cache();
+        self.catalog.clear_cache();
+    }
+
+    fn resolve_effective_language(setting: &str) -> String {
+    match setting {
+        "pt-BR" | "es" | "en" => setting.to_owned(),
+        _ => {
+            let sys = crate::services::app::system_locale().to_ascii_lowercase();
+            if sys.starts_with("pt") {
+                "pt-BR".to_owned()
+            } else if sys.starts_with("es") {
+                "es".to_owned()
+            } else {
+                "en".to_owned()
+            }
+        }
+    }
+}
+
+/// Background services, in the Electron boot order (after auth).
     /// Agreements subscribe first so the restored session refreshes them,
     /// exactly like `userAgreementsService.initialize()` before
     /// `await authService.initialize()`.

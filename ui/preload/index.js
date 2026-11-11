@@ -1116,7 +1116,7 @@ const GUGU_CACHE_TTL = {
 const GUGU_INCOMPLETE_TTL = 5 * GUGU_SEC;
 const GUGU_CACHE_MAX = 600;
 const GUGU_MUTATION_RE = /^(set|update|create|delete|remove|join|leave|toggle|accept|decline|send|follow|unfollow|unfriend|equip|rename|wear|purchase|checkout|switch|login|logout|redraw|save|overwrite|duplicate|pin|unpin|counter|add|clear|reset|mark|archive|perform)/;
-const GUGU_INVALIDATING_NAMESPACES = /* @__PURE__ */ new Set(["auth", "friends", "users", "games", "communities", "avatar", "catalog", "outfits", "events"]);
+const GUGU_INVALIDATING_NAMESPACES = /* @__PURE__ */ new Set(["auth", "friends", "users", "games", "communities", "avatar", "catalog", "outfits", "events", "settings"]);
 const guguCache = /* @__PURE__ */ new Map();
 const guguIsIncomplete = (value) => {
   if (value === null || value === void 0) {
