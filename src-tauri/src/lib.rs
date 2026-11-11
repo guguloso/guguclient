@@ -79,6 +79,7 @@ pub fn run() {
                     state.social.stop();
                     crate::services::game_avatar::stop(&state);
                     crate::services::captures::flush(&state);
+                    crate::services::macros::stop(&state);
                     crate::services::discord_rpc::shutdown(&state);
                     crate::services::version_maintenance::stop_background_updates(&state);
                     state.game_communities.flush(&state);
@@ -291,6 +292,12 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 /// `second-instance`: forward a protocol URL from the new process, or just
 /// bring the window back.
 fn on_second_instance(app: &AppHandle, argv: Vec<String>) {
+    if let Some(path) = services::macros::lrmacro_from_argv(&argv) {
+        if let Some(state) = app.try_state::<Arc<AppState>>() {
+            services::macros::stage_import_from_file(&state, &path);
+            return;
+        }
+    }
     match services::protocol::extract_protocol_url(&argv) {
         Some(url) => {
             if let Some(state) = app.try_state::<Arc<AppState>>() {

@@ -173,6 +173,7 @@ fn after_set(state: &Arc<AppState>, id: &str, value: &Value, previous: &Value) {
         }
         "mission-control-hotkey" => crate::services::mission_control::sync_hotkey(state),
         "open-on-startup" if changed => sync_open_on_startup(value.as_bool().unwrap_or(false)),
+        id if id.starts_with("captures-") => crate::services::captures::broadcast_status(state),
         "use-dev-services" => {
             crate::services::metadata::USE_DEV_SERVICES.store(value.as_bool() == Some(true), std::sync::atomic::Ordering::Relaxed);
             if changed {

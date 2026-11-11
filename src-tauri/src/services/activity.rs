@@ -527,7 +527,10 @@ fn update_discord(state: &Arc<AppState>) {
 fn run_effects(state: &Arc<AppState>, effects: Vec<Effect>) {
     for effect in effects {
         match effect {
-            Effect::Changed => state.events.emit("activity:changed", overview(state)),
+            Effect::Changed => {
+                state.events.emit("activity:changed", overview(state));
+                crate::services::macros::on_activity_changed(state);
+            }
             Effect::Discord => update_discord(state),
             Effect::Bloxstrap(message) => crate::services::discord_rpc::process_bloxstrap_message(state, message),
             Effect::SessionEnded(payload) => {
@@ -683,4 +686,11 @@ mod tests {
         assert!(validate_bloxstrap(&json!({ "command": "SetLaunchData", "data": "x" })).is_some());
         assert!(validate_bloxstrap(&json!({ "command": "SetRichPresence", "data": { "timeStart": -1 } })).is_none());
     }
+}
+
+/// `getCurrentActivity`: `(placeId, universeId)` while the instance is in a game.
+pub fn current_place(state: &AppState, id: &str) -> Option<(u64, Option<u64>)> {
+    let tracking = state.activity.tracking.lock();
+    let t = tracking.get(id).filter(|t| t.in_game && t.current.joined_at.is_some())?;
+    Some((t.current.place_id, t.current.universe))
 }

@@ -215,7 +215,7 @@ pub struct HotkeyState {
 }
 
 /// `ForegroundWindowService`: pid of the foreground window.
-fn foreground_pid() -> Option<u32> {
+pub fn foreground_pid() -> Option<u32> {
     #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};

@@ -68,6 +68,7 @@ pub struct AppState {
     pub login: crate::services::login::LoginState,
     pub challenge: crate::services::challenge::ChallengeState,
     pub captures: crate::services::captures::CapturesState,
+    pub macros: crate::services::macros::MacrosState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -126,6 +127,7 @@ impl AppState {
             login: Default::default(),
             challenge: Default::default(),
             captures: Default::default(),
+            macros: Default::default(),
             game_communities: Default::default(),
             app,
             events,
@@ -164,12 +166,16 @@ impl AppState {
             crate::services::social::SocialService::start(&state);
             crate::services::mission_control::sync_hotkey(&state);
             crate::services::captures::start(&state);
+            crate::services::macros::start(&state);
             crate::services::discord_rpc::start_stop(&state);
             crate::services::version_maintenance::start_stop_background_updates(&state);
             crate::services::game_avatar::start_recovery(&state);
             crate::services::protocol::sync_handlers(&state).await;
             crate::services::version_maintenance::cleanup_on_startup(&state);
             let argv: Vec<String> = std::env::args().collect();
+            if let Some(path) = crate::services::macros::lrmacro_from_argv(&argv) {
+                crate::services::macros::stage_import_from_file(&state, &path);
+            }
             if let Some(url) = crate::services::protocol::extract_protocol_url(&argv) {
                 tracing::info!("Processing queued protocol URL");
                 crate::services::protocol::handle_url(&state, &url, "process_args").await;

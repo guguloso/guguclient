@@ -30,6 +30,8 @@ pub mod instances;
 pub mod inventory;
 pub mod launch;
 pub mod launcher_notifications;
+pub mod macro_input;
+pub mod macros;
 pub mod login;
 pub mod metadata;
 pub mod mission_control;
@@ -97,6 +99,7 @@ pub fn register_all(router: &mut Router) {
     login::register(router);
     challenge::register(router);
     captures::register(router);
+    macros::register(router);
     version_maintenance::register(router);
     game_avatar::register(router);
     thumbnails::register(router);
