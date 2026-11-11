@@ -55,4 +55,4 @@ cargo test --lib
 
 ## Releases and auto-update
 
-The built-in updater reads the latest release of `guguloso/guguclient` on GitHub and downloads the first `.exe` asset whose version is newer than the running one. To publish an update, bump `version` in `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, build, and attach `GuguClient.exe` to a release tagged `v<version>`.
+The built-in updater reads the latest release of `guguloso/guguclient` on GitHub and downloads the first `.exe` asset whose version is newer than the running one. To publish an update, bump `version` in `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, and `setup/Cargo.toml`, and push a tag `v<version>` (the Release workflow builds and attaches `GuguClient-Setup-windows-x64.exe`).

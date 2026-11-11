@@ -50,15 +50,11 @@ jobs:
         working-directory: setup
         run: cargo build --release
 
-      - name: Stage release artifacts and checksums
+      - name: Stage release artifacts
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-artifacts | Out-Null
-          Copy-Item "src-tauri/target/release/GuguClient.exe" "release-artifacts/GuguClient.exe"
-          Copy-Item "setup/target/release/GuguSetup.exe" "release-artifacts/GuguSetup.exe"
-          $clientHash = (Get-FileHash "release-artifacts/GuguClient.exe" -Algorithm SHA256).Hash.ToLower()
-          $setupHash = (Get-FileHash "release-artifacts/GuguSetup.exe" -Algorithm SHA256).Hash.ToLower()
-          "$clientHash  GuguClient.exe`n$setupHash  GuguSetup.exe`n" | Out-File -FilePath "release-artifacts/SHA256SUMS.txt" -Encoding utf8 -NoNewline
+          Copy-Item "setup/target/release/GuguSetup.exe" "release-artifacts/GuguClient-Setup-windows-x64.exe"
 
       - name: Create or Update GitHub Release
         shell: pwsh
@@ -67,6 +63,7 @@ jobs:
         run: |
           $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag }}" } else { "${{ github.ref_name }}" }
           $notesFile = "docs/devlog/$tag.md"
+          $assetName = "GuguClient-Setup-windows-x64.exe"
           $exists = $false
           & gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { $exists = $true }
@@ -74,13 +71,17 @@ jobs:
             if (Test-Path $notesFile) {
               & gh release edit $tag --title "Gugu Client $tag" --notes-file $notesFile
             }
-            & gh release upload $tag "release-artifacts/GuguClient.exe" "release-artifacts/GuguSetup.exe" "release-artifacts/SHA256SUMS.txt" --clobber
+            $oldAssets = & gh release view $tag --json assets --jq ".assets[].name"
+            foreach ($old in $oldAssets) {
+              if ($old -and $old -ne $assetName) {
+                & gh release delete-asset $tag $old --yes
+              }
+            }
+            & gh release upload $tag "release-artifacts/$assetName" --clobber
           } else {
             $ghArgs = @(
               "release", "create", $tag,
-              "release-artifacts/GuguClient.exe",
-              "release-artifacts/GuguSetup.exe",
-              "release-artifacts/SHA256SUMS.txt",
+              "release-artifacts/$assetName",
               "--title", "Gugu Client $tag"
             )
             if (Test-Path $notesFile) {

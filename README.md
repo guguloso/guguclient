@@ -64,7 +64,7 @@
 
 Gugu Client is a fork of **Lunar for Roblox**, rebuilt with a native **Rust + [Tauri 2](https://tauri.app)** backend and actively maintained with constant updates — no Electron, no bundled Chromium, no Node.js runtime.
 
-- **Single executable or native installer**: one ~23 MB portable `GuguClient.exe` (or the clean Rust `GuguSetup.exe` installer) with the UI embedded, rendered by the system's WebView2
+- **Fast native setup**: one ~12 MB `GuguClient-Setup-windows-x64.exe` installer written in pure Rust that sets up `GuguClient.exe` (~23 MB) with WebView2 rendering
 - **Multi-language UI**: automatically adapts to your Windows language/region (**Português (Brasil)**, **English**, **Español**), with manual switching in **Settings → Appearance**
 - **Native backend**: accounts, instances, FastFlags, mods, Discord RPC, macros, captures and the avatar renderer all run in async Rust on Tokio
 - **Light on resources**: around 50 MB of RAM for the launcher process
@@ -88,7 +88,7 @@ guguclient/
 
 ## Quick Start
 
-1. Download **`GuguSetup.exe`** (clean installer with shortcuts & uninstaller) or **`GuguClient.exe`** (portable) from the latest release on the [Releases][repo-releases] page.
+1. Download **`GuguClient-Setup-windows-x64.exe`** from the latest release on the [Releases][repo-releases] page.
 2. Run it — setup completes in seconds with zero extra dependencies.
 3. Sign in, set up an instance and launch any Roblox game.
 
