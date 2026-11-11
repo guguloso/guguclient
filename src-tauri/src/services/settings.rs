@@ -194,7 +194,7 @@ fn sync_analytics_opt_out(enabled: bool) {
     if enabled {
         return;
     }
-    if let Err(error) = crate::services::registry::set(r"HKCU\Software\LunarForRoblox", Some("AnalyticsOptOut"), "REG_SZ", "1") {
+    if let Err(error) = crate::services::registry::set(crate::services::protocol::APP_REGISTRY_KEY, Some("AnalyticsOptOut"), "REG_SZ", "1") {
         tracing::warn!("[Analytics] Could not sync the uninstall opt-out marker: {error}");
     }
 }

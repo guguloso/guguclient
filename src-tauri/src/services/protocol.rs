@@ -21,7 +21,11 @@ const ROBLOX_PREFIX: &str = "roblox:";
 const STUDIO_PREFIX: &str = "roblox-studio:";
 const PLACE_LAUNCHER_KEY: &str = "placelauncherurl:";
 const ROBLOX_SCHEMES: [&str; 3] = ["roblox-player", "roblox", "roblox-studio"];
-const BACKUP_KEY: &str = r"HKCU\Software\LunarForRoblox\ProtocolHandlerBackup";
+/// The launcher's own registry key (analytics opt-out marker, handler backups).
+pub const APP_REGISTRY_KEY: &str = r"HKCU\Software\GuguForRoblox";
+const LEGACY_APP_REGISTRY_KEY: &str = r"HKCU\Software\LunarForRoblox";
+const BACKUP_KEY: &str = r"HKCU\Software\GuguForRoblox\ProtocolHandlerBackup";
+const LEGACY_BACKUP_KEY: &str = r"HKCU\Software\LunarForRoblox\ProtocolHandlerBackup";
 const CLASS_PREFIX: &str = r"HKCU\Software\Classes\";
 const COMMAND_SUBKEY: &str = r"\shell\open\command";
 const EXCLUDED_NAVIGATE_PREFIXES: [&str; 3] = ["/second-screen", "/updater", "/ad-test"];
@@ -517,8 +521,35 @@ fn restore_handler(scheme: &str) {
 
 /// `ensureAppSchemeRegistered` + `syncRobloxUrlHandlers` (startup and
 /// whenever `handle-roblox-urls` changes).
+/// Moves values written by earlier builds under `LunarForRoblox` to the
+/// launcher's own key, so the original Roblox handlers can still be restored.
+fn migrate_legacy_registry() {
+    if matches!(registry::query(LEGACY_APP_REGISTRY_KEY, Some("AnalyticsOptOut")), registry::Query::Missing)
+        && ROBLOX_SCHEMES.iter().all(|s| matches!(registry::query(LEGACY_BACKUP_KEY, Some(s)), registry::Query::Missing))
+    {
+        return;
+    }
+    let mut copied = true;
+    let values = ROBLOX_SCHEMES.iter().flat_map(|s| [(*s).to_owned(), format!("{s}.type")]);
+    for name in values {
+        if let registry::Query::Found { data, kind } = registry::query(LEGACY_BACKUP_KEY, Some(&name)) {
+            if matches!(registry::query(BACKUP_KEY, Some(&name)), registry::Query::Missing) {
+                copied &= registry::set(BACKUP_KEY, Some(&name), &kind, &data).is_ok();
+            }
+        }
+    }
+    if let registry::Query::Found { data, kind } = registry::query(LEGACY_APP_REGISTRY_KEY, Some("AnalyticsOptOut")) {
+        copied &= registry::set(APP_REGISTRY_KEY, Some("AnalyticsOptOut"), &kind, &data).is_ok();
+    }
+    if copied {
+        let _ = registry::delete(LEGACY_APP_REGISTRY_KEY, None);
+        tracing::info!("Moved registry settings from {LEGACY_APP_REGISTRY_KEY} to {APP_REGISTRY_KEY}");
+    }
+}
+
 pub async fn sync_handlers(state: &AppState) {
     let _guard = state.protocol.handler_sync.lock().await;
+    migrate_legacy_registry();
     if !is_protocol_client(LUNAR_SCHEME) {
         if set_protocol_client(LUNAR_SCHEME) {
             tracing::info!("Registered as default protocol handler for {LUNAR_SCHEME}:// URLs");

@@ -1059,7 +1059,7 @@ fn write_cart(state: &AppState, user_id: u64, items: &[Value]) {
     let path = cart_path(state, user_id);
     let result = (|| -> AppResult<()> {
         std::fs::create_dir_all(path.parent().expect("cart file has a parent"))?;
-        let tmp = path.with_extension("json.lunar-for-roblox.tmp");
+        let tmp = path.with_extension("json.gugu-for-roblox.tmp");
         std::fs::write(&tmp, serde_json::to_vec_pretty(&json!({ "items": items }))?)?;
         std::fs::rename(&tmp, &path)?;
         Ok(())

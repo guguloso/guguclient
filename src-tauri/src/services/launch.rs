@@ -576,7 +576,7 @@ fn patch_app_storage(overrides: &[(&str, &str)]) {
         }
         if changed {
             let bytes = serde_json::to_vec(&Value::Object(storage)).unwrap_or_default();
-            let tmp = path.with_extension("json.lunar-for-roblox.tmp");
+            let tmp = path.with_extension("json.gugu-for-roblox.tmp");
             let result = std::fs::create_dir_all(path.parent().expect("appStorage has a parent"))
                 .and_then(|()| std::fs::write(&tmp, bytes))
                 .and_then(|()| std::fs::rename(&tmp, &path));

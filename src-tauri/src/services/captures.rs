@@ -30,7 +30,8 @@ const LIBRARY_INDEX_SOURCELESS_VERSION: u64 = 2;
 const PERSIST_DEBOUNCE: Duration = Duration::from_millis(500);
 const SCREENSHOTS_SUBDIR: &str = "Screenshots";
 const CLIPS_SUBDIR: &str = "Clips";
-const DEFAULT_FOLDER_NAME: &str = "Lunar";
+const DEFAULT_FOLDER_NAME: &str = "Gugu";
+const LEGACY_FOLDER_NAME: &str = "Lunar";
 const ROBLOX_CAPTURES_SUBDIR: &str = "Roblox";
 const SCREENSHOT_EXTENSIONS: [&str; 3] = ["jpg", "jpeg", "png"];
 const CLIP_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
@@ -127,7 +128,17 @@ fn captures_directory(state: &AppState) -> PathBuf {
     if !trimmed.is_empty() {
         return PathBuf::from(trimmed);
     }
-    dirs::video_dir().unwrap_or_else(|| state.paths.base.clone()).join(DEFAULT_FOLDER_NAME)
+    let parent = dirs::video_dir().unwrap_or_else(|| state.paths.base.clone());
+    let folder = parent.join(DEFAULT_FOLDER_NAME);
+    let legacy = parent.join(LEGACY_FOLDER_NAME);
+    if !folder.exists() && legacy.is_dir() {
+        // Earlier builds saved into `Videos\Lunar`; keep the library intact.
+        if let Err(error) = std::fs::rename(&legacy, &folder) {
+            tracing::warn!("Could not move captures from {}: {error}", legacy.display());
+            return legacy;
+        }
+    }
+    folder
 }
 
 /// `resolveCaptureRoots`.

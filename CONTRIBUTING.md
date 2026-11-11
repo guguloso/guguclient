@@ -4,7 +4,7 @@ Thank you for your interest in contributing to **Gugu Client**!
 
 ## Reporting Issues
 - Check existing issues before opening a new one.
-- Use the **Bug Report** template and include your Windows version, Gugu Client version, and relevant log snippets from `%USERPROFILE%\.lunar-for-roblox\logs\`.
+- Use the **Bug Report** template and include your Windows version, Gugu Client version, and relevant log snippets from `%USERPROFILE%\.gugu-for-roblox\logs\`.
 
 ## Pull Requests
 1. Fork the repository and create a branch from `main`.

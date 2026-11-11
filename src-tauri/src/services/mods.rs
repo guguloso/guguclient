@@ -28,7 +28,7 @@ const IMPORT_EXTENSIONS: [&str; 18] =
 const RUNTIME_EXTENSIONS: [&str; 18] =
     [".csv", ".dds", ".dict", ".jpg", ".js", ".json", ".mesh", ".mp3", ".ogg", ".otf", ".placeholder", ".png", ".rbxl", ".rbxm", ".rbxmx", ".tex", ".ttf", ".txt"];
 const RUNTIME_METADATA_SCHEMA_VERSION: u64 = 1;
-const RUNTIME_METADATA_FILENAME: &str = ".lunar-for-roblox-runtime.json";
+const RUNTIME_METADATA_FILENAME: &str = ".gugu-for-roblox-runtime.json";
 const CUSTOM_FONT_ASSET_PATH: &str = "rbxasset://fonts/CustomFont.ttf";
 const NO_OVERLAY_FILES: &str = "No valid overlay files found. Use content/, ExtraContent/, or PlatformContent/ paths.";
 

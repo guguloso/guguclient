@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-    A lightweight, high-performance Roblox launcher &amp; client built for clean aesthetics, FastFlag tuning, and deep customization.
+    A fast, native Roblox launcher &amp; client — FastFlag tuning, mods, multi-account, social and a 3D avatar studio in one small executable.
 </p>
 
 <p align="center">
@@ -30,39 +30,39 @@
 
 ---
 
-## Key Features &amp; Improvements
+## Features
 
-### Performance &amp; Optimization
-- **FastFlag Profiles &amp; Editor**: Unlock FPS caps, adjust lighting/rendering quality, tweak textures, and disable unnecessary telemetry before Roblox launches
-- **Zero Background Bloat**: Runs strictly when you play — no persistent startup services or hidden background updaters eating RAM
-- **Low Overhead**: Fast process detection with minimal CPU/memory footprint while you are in-game
-- **Clean Storage**: Automatically cleans up old runtime caches after updates while keeping your settings and profiles safe
+### Play
+- **Instances**: separate Roblox setups, each with its own FastFlags, mods, fonts and account
+- **Multi-Instance**: run several Roblox sessions at once and track them from the title bar or system tray
+- **FastFlag Profiles &amp; Editor**: unlock FPS caps, tune lighting, rendering and textures before Roblox starts
+- **Mods**: custom cursors, sounds, fonts and game assets per instance
+- **Deep links**: `roblox://` support — click Play on the Roblox website and launch through Gugu Client
+- **Macros**: record, bind and share macros per game
 
-### Integrations &amp; Discord RPC
-- Custom **Discord Rich Presence** that displays the experience you're playing, creator name, and active session playtime
-- Quick **See game page** and **Join Server** buttons directly on your Discord profile
-- Full **Bloxstrap RPC** support for dynamic in-game status updates
-- Native `roblox://` deep-link support — click Play on the Roblox website and launch seamlessly through Gugu Client
+### Social
+- **Friends &amp; presence**: see who is online and join their game in one click
+- **Chat, trades and communities** without opening the browser
+- **Account Switcher**: sign in once per account and switch instantly
 
-### Mods &amp; Customization
-- Customize cursors, sounds, fonts, and game assets per instance
-- Sleek dark-themed launcher UI with minimal visual clutter
-- Built-in macro engine and Roblox Studio launching support
+### Avatar
+- **3D avatar preview** with animations (idle, walk, run, emotes), layered clothing and dynamic heads
+- Saved characters, outfits and the catalog side by side
 
-### Multi-Instance &amp; Accounts
-- **Account Switcher**: Manage and switch between multiple Roblox accounts in one click
-- **Multi-Instance Support**: Launch and track multiple Roblox sessions simultaneously from the title bar or system tray
-- **Automatic Updates**: Built-in **Check for Updates** downloads and installs new releases directly from GitHub with zero manual setup
+### Integrations
+- **Discord Rich Presence** with the experience, creator, playtime and **Join Server** buttons
+- Full **Bloxstrap RPC** support for in-game status updates
+- **Automatic updates** for both Roblox versions and Gugu Client itself, straight from GitHub releases
 
 ---
 
 ## Built with Rust
 
-Gugu Client is a fully native **Rust + [Tauri 2](https://tauri.app)** application — no Electron, no bundled Chromium, no Node.js runtime.
+Gugu Client is a native **Rust + [Tauri 2](https://tauri.app)** application — no Electron, no bundled Chromium, no Node.js runtime.
 
-- **Single executable**: one small `GuguClient.exe` with the UI embedded, rendered by the system's WebView2
-- **Native backend**: every launcher feature (accounts, instances, FastFlags, mods, Discord RPC, macros, captures, avatar 3D preview) runs in async Rust on Tokio
-- **Lower footprint**: a fraction of the memory and disk space of the old Electron build
+- **Single executable**: one ~22 MB `GuguClient.exe` with the UI embedded, rendered by the system's WebView2
+- **Native backend**: accounts, instances, FastFlags, mods, Discord RPC, macros, captures and the avatar renderer all run in async Rust on Tokio
+- **Light on resources**: around 50 MB of RAM for the launcher process
 
 ```
 guguclient/
@@ -70,7 +70,7 @@ guguclient/
 │   ├── src/
 │   │   ├── ipc/        # IPC router: one command serves every `window.api` channel
 │   │   ├── roblox/     # Roblox web API client (CSRF, challenges, rate limits)
-│   │   └── services/   # Launcher services: launch, versions, mods, macros, avatar render…
+│   │   └── services/   # Launch, versions, mods, macros, social, avatar render…
 │   ├── scripts/        # prepare-frontend.mjs: embeds the UI and generates the bridge
 │   └── icons/
 ├── ui/                 # Launcher UI (renderer + preload API surface)
@@ -83,8 +83,18 @@ guguclient/
 ## Quick Start
 
 1. Download `GuguClient.exe` from the latest release on the [Releases][repo-releases] page.
-2. Run it — a single native executable, no installer and no extraction step. Accounts, settings and instances live in `%USERPROFILE%\.lunar-for-roblox\`.
-3. Sign in, configure your FastFlags, Mods or Discord RPC preferences and launch any Roblox game.
+2. Run it — no installer, no extraction step.
+3. Sign in, set up an instance and launch any Roblox game.
+
+### Where your data lives
+
+| What | Location |
+| --- | --- |
+| Accounts, settings, instances, Roblox versions | `%USERPROFILE%\.gugu-for-roblox\` |
+| Logs | `%USERPROFILE%\.gugu-for-roblox\logs\` |
+| Screenshots and clips | `%USERPROFILE%\Videos\Gugu\` |
+
+Coming from an older build? Your existing `.lunar-for-roblox` folder and `Videos\Lunar` captures are moved to the new locations on first launch.
 
 ### System Requirements
 - **OS:** Windows 10 or Windows 11 (64-bit)
@@ -94,7 +104,7 @@ guguclient/
 
 ## Building from Source
 
-Gugu Client is a native Rust application built on [Tauri 2](https://tauri.app): the backend lives in `src-tauri/`, the UI in `ui/`.
+Requires [Rust](https://rustup.rs) (MSVC toolchain) and Node.js 20+.
 
 ```powershell
 cd src-tauri
@@ -102,7 +112,7 @@ node scripts/prepare-frontend.mjs
 cargo build --release --features custom-protocol
 ```
 
-The executable is written to `src-tauri/target/release/GuguClient.exe`. See [BUILDING.md](./BUILDING.md) for details.
+The executable is written to `src-tauri/target/release/GuguClient.exe`. See [BUILDING.md](./BUILDING.md) for development, tests and releases.
 
 ---
 

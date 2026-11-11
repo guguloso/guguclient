@@ -1,6 +1,6 @@
 //! Server-driven feature flags (`featureFlags:*`). Port of `FeatureFlagService`.
 //!
-//! Resolution order per key: dev override (`LUNAR_FEATURE_FLAGS`, debug
+//! Resolution order per key: dev override (`GUGU_FEATURE_FLAGS`, debug
 //! builds only) → server value → registry default. The last server map is
 //! cached in `cache.json` (`featureFlags.server`) for offline boots.
 
@@ -14,7 +14,7 @@ use crate::util::now_millis;
 const CACHE_KEY: &str = "featureFlags.server";
 const CHANGED_EVENT: &str = "featureFlags:changed";
 #[cfg(debug_assertions)]
-const OVERRIDE_ENV: &str = "LUNAR_FEATURE_FLAGS";
+const OVERRIDE_ENV: &str = "GUGU_FEATURE_FLAGS";
 
 /// `FEATURE_FLAG_DEFAULTS`, in registry order.
 const DEFAULTS: [(&str, bool); 7] = [

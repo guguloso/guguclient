@@ -236,7 +236,7 @@ pub fn write_json(path: &Path, value: &serde_json::Value) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let tmp = path.with_extension("json.lunar-for-roblox.tmp");
+    let tmp = path.with_extension("json.gugu-for-roblox.tmp");
     std::fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
     std::fs::rename(&tmp, path)?;
     Ok(())

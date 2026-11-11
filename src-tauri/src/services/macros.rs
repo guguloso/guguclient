@@ -509,7 +509,7 @@ fn analytics_track(state: &AppState, event: &str, payload: Value) {
 
 /// `parseEnvelopeJson`.
 fn parse_envelope(text: &str) -> Result<(Option<String>, Vec<Value>), String> {
-    const INVALID: &str = "This is not a valid Lunar macro export.";
+    const INVALID: &str = "This is not a valid Gugu macro export.";
     let raw: Value = serde_json::from_str(text).map_err(|_| INVALID.to_owned())?;
     let version = raw.get("version").and_then(Value::as_i64).filter(|v| *v >= 1);
     if raw.get("format").and_then(Value::as_str) != Some(LRMACRO_FORMAT) || version.is_none() {
@@ -657,7 +657,7 @@ async fn export_to_file(state: &AppState, id: &str) -> Value {
     let Some(m) = list(state).into_iter().find(|m| m["id"] == id) else { return json!({ "ok": false, "error": "Macro not found." }) };
     let cleaned: String = m["name"].as_str().unwrap_or("").chars().filter(|c| !"\\/:*?\"<>|".contains(*c) && (*c as u32) >= 0x20).collect();
     let file_name = format!("{}.{LRMACRO_EXTENSION}", if cleaned.trim().is_empty() { "macro".to_owned() } else { cleaned.trim().to_owned() });
-    let mut dialog = rfd::AsyncFileDialog::new().set_title("Export Macro").set_file_name(&file_name).add_filter("Lunar Macro", &[LRMACRO_EXTENSION]);
+    let mut dialog = rfd::AsyncFileDialog::new().set_title("Export Macro").set_file_name(&file_name).add_filter("Gugu Macro", &[LRMACRO_EXTENSION]);
     if let Some(downloads) = dirs::download_dir() {
         dialog = dialog.set_directory(downloads);
     }
@@ -677,7 +677,7 @@ async fn export_to_file(state: &AppState, id: &str) -> Value {
 }
 
 async fn import_from_picker(state: &AppState) -> Value {
-    let picked = rfd::AsyncFileDialog::new().set_title("Import Macro").add_filter("Lunar Macro", &[LRMACRO_EXTENSION]).add_filter("All files", &["*"]).pick_file().await;
+    let picked = rfd::AsyncFileDialog::new().set_title("Import Macro").add_filter("Gugu Macro", &[LRMACRO_EXTENSION]).add_filter("All files", &["*"]).pick_file().await;
     let Some(picked) = picked else { return json!({ "ok": true, "value": false }) };
     match read_envelope_file(picked.path()) {
         Ok((export_id, macros)) => {
