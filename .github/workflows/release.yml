@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Prepare frontend
+        working-directory: src-tauri
+        run: node scripts/prepare-frontend.mjs
+
+      - name: Run library tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Build release executable
+        working-directory: src-tauri
+        run: cargo build --release --features custom-protocol
+
+      - name: Stage release artifacts and checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-artifacts | Out-Null
+          Copy-Item "src-tauri/target/release/GuguClient.exe" "release-artifacts/GuguClient.exe"
+          $hash = (Get-FileHash "release-artifacts/GuguClient.exe" -Algorithm SHA256).Hash.ToLower()
+          "$hash  GuguClient.exe`n" | Out-File -FilePath "release-artifacts/SHA256SUMS.txt" -Encoding utf8 -NoNewline
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag }}" } else { "${{ github.ref_name }}" }
+          $notesFile = "docs/devlog/$tag.md"
+          $ghArgs = @(
+            "release", "create", $tag,
+            "release-artifacts/GuguClient.exe",
+            "release-artifacts/SHA256SUMS.txt",
+            "--title", "Gugu Client $tag"
+          )
+          if (Test-Path $notesFile) {
+            $ghArgs += @("--notes-file", $notesFile)
+          } else {
+            $ghArgs += "--generate-notes"
+          }
+          & gh @ghArgs
