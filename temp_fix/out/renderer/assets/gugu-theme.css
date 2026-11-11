@@ -441,6 +441,13 @@ button, [role="button"] {
 /* Dialog bodies scroll when their content outgrows them (the profile's
    Wearing tab: the 384px 3D viewer card was clipped at 1400x800). */
 [role=dialog] > div.flex.min-h-0.flex-1.flex-col.overflow-hidden { overflow-y: auto !important; }
+/* ...and the item list beside that viewer grows to the viewer's height
+   instead of stopping at the clipped 291px (contain: size keeps its long
+   content out of the row's min-content). */
+@media (min-width: 1024px) {
+  [role=dialog] div.min-h-0.flex-col:has(> div.self-start.shrink-0 + div.overflow-hidden.flex-1) { min-height: min-content !important; }
+  [role=dialog] div.self-start.shrink-0 + div.overflow-hidden.flex-1 { contain: size; height: auto !important; align-self: stretch; }
+}
 .gugu-shell::before {
   content: "";
   position: absolute;
