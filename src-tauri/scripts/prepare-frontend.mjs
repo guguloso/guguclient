@@ -32,6 +32,8 @@ const widen = (directive, extra) => {
 };
 widen("connect-src", "ipc: http://ipc.localhost");
 widen("img-src", "http://lbx-thumb.localhost");
+widen("img-src", "http://lbx-capture.localhost");
+widen("media-src", "http://lbx-capture.localhost");
 fs.writeFileSync(indexPath, html);
 
 // Renderer-built thumbnail URLs use the Electron-only `lbx-thumb://` scheme;

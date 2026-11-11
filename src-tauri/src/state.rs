@@ -67,6 +67,7 @@ pub struct AppState {
     pub hotkey: crate::services::mission_control::HotkeyState,
     pub login: crate::services::login::LoginState,
     pub challenge: crate::services::challenge::ChallengeState,
+    pub captures: crate::services::captures::CapturesState,
     pub game_communities: Arc<crate::services::communities::GameCommunityIndex>,
 }
 
@@ -124,6 +125,7 @@ impl AppState {
             hotkey: Default::default(),
             login: Default::default(),
             challenge: Default::default(),
+            captures: Default::default(),
             game_communities: Default::default(),
             app,
             events,
@@ -161,6 +163,7 @@ impl AppState {
             crate::services::chat::ChatPoller::start(&state);
             crate::services::social::SocialService::start(&state);
             crate::services::mission_control::sync_hotkey(&state);
+            crate::services::captures::start(&state);
             crate::services::discord_rpc::start_stop(&state);
             crate::services::version_maintenance::start_stop_background_updates(&state);
             crate::services::game_avatar::start_recovery(&state);

@@ -56,6 +56,7 @@ pub fn run() {
             services::thumbnails::PROTOCOL,
             services::thumbnails::protocol_handler,
         )
+        .register_asynchronous_uri_scheme_protocol(services::captures::PROTOCOL, services::captures::protocol_handler)
         .invoke_handler(tauri::generate_handler![ipc::ipc_invoke])
         .setup(move |app| {
             let state = Arc::new(AppState::initialize(app.handle().clone(), paths)?);
@@ -77,6 +78,7 @@ pub fn run() {
                 if let Some(state) = app.try_state::<Arc<AppState>>() {
                     state.social.stop();
                     crate::services::game_avatar::stop(&state);
+                    crate::services::captures::flush(&state);
                     crate::services::discord_rpc::shutdown(&state);
                     crate::services::version_maintenance::stop_background_updates(&state);
                     state.game_communities.flush(&state);

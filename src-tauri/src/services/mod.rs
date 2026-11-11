@@ -11,6 +11,7 @@ pub mod app;
 pub mod auth;
 pub mod avatar;
 pub mod cache;
+pub mod captures;
 pub mod challenge;
 pub mod catalog;
 pub mod chat;
@@ -95,6 +96,7 @@ pub fn register_all(router: &mut Router) {
     mods::register(router);
     login::register(router);
     challenge::register(router);
+    captures::register(router);
     version_maintenance::register(router);
     game_avatar::register(router);
     thumbnails::register(router);
