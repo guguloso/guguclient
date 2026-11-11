@@ -77,10 +77,35 @@ const __guguWrapError = (channel) => (error) => {
   if (error && error.code) wrapped.code = error.code;
   throw wrapped;
 };
+// Typed arrays cross the JSON bridge as { __lbxTyped, b64 } (Electron's IPC
+// structured clone carried them natively).
+const __guguTypedArrays = { Uint8Array, Uint16Array, Uint32Array, Int32Array, Float32Array, Float64Array };
+const __guguBytes = (b64) => {
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(b64);
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+};
+const __guguRevive = (value) => {
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) value[i] = __guguRevive(value[i]);
+    return value;
+  }
+  if (value && typeof value === "object") {
+    const Typed = typeof value.__lbxTyped === "string" && __guguTypedArrays[value.__lbxTyped];
+    if (Typed) {
+      const bytes = __guguBytes(value.b64);
+      return Typed === Uint8Array ? bytes : new Typed(bytes.buffer, 0, bytes.byteLength / Typed.BYTES_PER_ELEMENT);
+    }
+    for (const key of Object.keys(value)) value[key] = __guguRevive(value[key]);
+  }
+  return value;
+};
 const electron = {
   ipcRenderer: {
     invoke: (channel, ...args) =>
-      __guguInvoke("ipc_invoke", { channel, args }).catch(__guguWrapError(channel)),
+      __guguInvoke("ipc_invoke", { channel, args }).then(__guguRevive, __guguWrapError(channel)),
     on: (channel, handler) => {
       __guguSubscribe();
       let handlers = __guguListeners.get(channel);

@@ -57,6 +57,8 @@ sha2 = "0.10"
 base64 = "0.22"
 aes-gcm = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+# zstd-compressed rbxm chunks (pure Rust, like the Electron build's fzstd).
+ruzstd = "0.8"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

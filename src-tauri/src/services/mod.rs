@@ -10,6 +10,7 @@ pub mod activity;
 pub mod app;
 pub mod auth;
 pub mod avatar;
+pub mod avatar_render;
 pub mod cache;
 pub mod captures;
 pub mod challenge;
@@ -90,6 +91,7 @@ pub fn register_all(router: &mut Router) {
     trades::register(router);
     private_servers::register(router);
     avatar::register(router);
+    avatar_render::register(router);
     outfits::register(router);
     outfit_wear::register(router);
     purchases::register(router);
