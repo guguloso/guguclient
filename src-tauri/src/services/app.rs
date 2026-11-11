@@ -293,10 +293,38 @@ async fn item_values(state: &AppState, force: bool) -> Result<Value, AppError> {
     Ok(cache)
 }
 
+/// Returns the OS user locale tag (e.g. `"pt-BR"`, `"en-US"`, `"es-ES"`).
+pub fn system_locale() -> String {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Globalization::GetUserDefaultLocaleName;
+        const LOCALE_NAME_MAX_LENGTH: usize = 85;
+        let mut buf = [0u16; LOCALE_NAME_MAX_LENGTH];
+        // SAFETY: `buf` is stack-allocated with length `LOCALE_NAME_MAX_LENGTH`.
+        let len = unsafe { GetUserDefaultLocaleName(buf.as_mut_ptr(), buf.len() as i32) };
+        if len > 1 {
+            let tag = String::from_utf16_lossy(&buf[..(len as usize - 1)]);
+            if !tag.trim().is_empty() {
+                return tag;
+            }
+        }
+    }
+    for var in ["LC_ALL", "LC_MESSAGES", "LANG"] {
+        if let Ok(val) = std::env::var(var) {
+            let cleaned = val.split('.').next().unwrap_or("").replace('_', "-");
+            if !cleaned.is_empty() && cleaned != "C" && cleaned != "POSIX" {
+                return cleaned;
+            }
+        }
+    }
+    "en-US".to_owned()
+}
+
 pub fn register(router: &mut Router) {
     router
         .handle("app:openApplicationFolder", |ctx, _| async move { Ok(roblox_layout::open_path(&ctx.state.paths.base)) })
         .handle("app:getInstallationId", |ctx, _| async move { Ok(metadata::installation_id_value(&ctx.state.paths.base)) })
+        .handle("app:getSystemLocale", |_, _| async move { Ok(system_locale()) })
         .handle("app:openExternal", |ctx, args| async move {
             let url: String = args.get(0)?;
             let source_route: Option<Value> = args.opt(1)?;

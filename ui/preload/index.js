@@ -719,6 +719,8 @@ const IPC_HANDLER_SCHEMA = {
     openApplicationFolder: handler(),
     /** Get the persistent installation UUID for this device */
     getInstallationId: handler(),
+    /** Get the operating system user locale tag (e.g. "pt-BR") */
+    getSystemLocale: handler(),
     /**
      * Open a URL in the user's default browser and record an
      * `external.open` analytics event. This should be used for

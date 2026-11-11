@@ -20,6 +20,7 @@ app-asar/
 
 # Rust / Tauri port
 src-tauri/target/
+setup/target/
 src-tauri/gen/
 src-tauri/generated/
 dist-tauri/

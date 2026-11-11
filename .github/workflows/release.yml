@@ -46,13 +46,19 @@ jobs:
         working-directory: src-tauri
         run: cargo build --release --features custom-protocol
 
+      - name: Build Rust installer
+        working-directory: setup
+        run: cargo build --release
+
       - name: Stage release artifacts and checksums
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-artifacts | Out-Null
           Copy-Item "src-tauri/target/release/GuguClient.exe" "release-artifacts/GuguClient.exe"
-          $hash = (Get-FileHash "release-artifacts/GuguClient.exe" -Algorithm SHA256).Hash.ToLower()
-          "$hash  GuguClient.exe`n" | Out-File -FilePath "release-artifacts/SHA256SUMS.txt" -Encoding utf8 -NoNewline
+          Copy-Item "setup/target/release/GuguSetup.exe" "release-artifacts/GuguSetup.exe"
+          $clientHash = (Get-FileHash "release-artifacts/GuguClient.exe" -Algorithm SHA256).Hash.ToLower()
+          $setupHash = (Get-FileHash "release-artifacts/GuguSetup.exe" -Algorithm SHA256).Hash.ToLower()
+          "$clientHash  GuguClient.exe`n$setupHash  GuguSetup.exe`n" | Out-File -FilePath "release-artifacts/SHA256SUMS.txt" -Encoding utf8 -NoNewline
 
       - name: Create or Update GitHub Release
         shell: pwsh
@@ -68,11 +74,12 @@ jobs:
             if (Test-Path $notesFile) {
               & gh release edit $tag --title "Gugu Client $tag" --notes-file $notesFile
             }
-            & gh release upload $tag "release-artifacts/GuguClient.exe" "release-artifacts/SHA256SUMS.txt" --clobber
+            & gh release upload $tag "release-artifacts/GuguClient.exe" "release-artifacts/GuguSetup.exe" "release-artifacts/SHA256SUMS.txt" --clobber
           } else {
             $ghArgs = @(
               "release", "create", $tag,
               "release-artifacts/GuguClient.exe",
+              "release-artifacts/GuguSetup.exe",
               "release-artifacts/SHA256SUMS.txt",
               "--title", "Gugu Client $tag"
             )

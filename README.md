@@ -64,7 +64,8 @@
 
 Gugu Client is a fork of **Lunar for Roblox**, rebuilt with a native **Rust + [Tauri 2](https://tauri.app)** backend and actively maintained with constant updates — no Electron, no bundled Chromium, no Node.js runtime.
 
-- **Single executable**: one ~22 MB `GuguClient.exe` with the UI embedded, rendered by the system's WebView2
+- **Single executable or native installer**: one ~23 MB portable `GuguClient.exe` (or the clean Rust `GuguSetup.exe` installer) with the UI embedded, rendered by the system's WebView2
+- **Multi-language UI**: automatically adapts to your Windows language/region (**Português (Brasil)**, **English**, **Español**), with manual switching in **Settings → Appearance**
 - **Native backend**: accounts, instances, FastFlags, mods, Discord RPC, macros, captures and the avatar renderer all run in async Rust on Tokio
 - **Light on resources**: around 50 MB of RAM for the launcher process
 
@@ -77,17 +78,18 @@ guguclient/
 │   │   └── services/   # Launch, versions, mods, macros, social, avatar render…
 │   ├── scripts/        # prepare-frontend.mjs: embeds the UI and generates the bridge
 │   └── icons/
-├── ui/                 # Launcher UI (renderer + preload API surface)
-├── docs/               # IPC coverage report
-└── .github/            # CI workflow and issue templates
+├── setup/              # Native Rust Windows installer (GuguSetup.exe)
+├── ui/                 # Launcher UI (renderer + preload API surface + i18n)
+├── docs/               # IPC coverage report and devlogs
+└── .github/            # CI & Release workflows
 ```
 
 ---
 
 ## Quick Start
 
-1. Download `GuguClient.exe` from the latest release on the [Releases][repo-releases] page.
-2. Run it — no installer, no extraction step.
+1. Download **`GuguSetup.exe`** (clean installer with shortcuts & uninstaller) or **`GuguClient.exe`** (portable) from the latest release on the [Releases][repo-releases] page.
+2. Run it — setup completes in seconds with zero extra dependencies.
 3. Sign in, set up an instance and launch any Roblox game.
 
 ### Where your data lives

@@ -27,6 +27,13 @@ cargo build --release --features custom-protocol
 
 Output: `src-tauri/target/release/GuguClient.exe`. The `custom-protocol` feature embeds `dist-tauri/` in the binary; without it the app expects a dev server.
 
+To also build the native Windows installer (`setup/target/release/GuguSetup.exe`, which embeds `GuguClient.exe`):
+
+```powershell
+cd ..\setup
+cargo build --release
+```
+
 On machines with little RAM, add `-j 2` to limit parallel compilation.
 
 ## Development

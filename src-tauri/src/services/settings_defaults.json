@@ -16,6 +16,7 @@
   "post-game-notifications": true,
   "os-notifications": true,
   "theme": "dark",
+  "language": "system",
   "enable-animations": true,
   "remember-session": true,
   "auto-clean-cache": false,
