@@ -54,22 +54,32 @@ jobs:
           $hash = (Get-FileHash "release-artifacts/GuguClient.exe" -Algorithm SHA256).Hash.ToLower()
           "$hash  GuguClient.exe`n" | Out-File -FilePath "release-artifacts/SHA256SUMS.txt" -Encoding utf8 -NoNewline
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "${{ inputs.tag }}" } else { "${{ github.ref_name }}" }
           $notesFile = "docs/devlog/$tag.md"
-          $ghArgs = @(
-            "release", "create", $tag,
-            "release-artifacts/GuguClient.exe",
-            "release-artifacts/SHA256SUMS.txt",
-            "--title", "Gugu Client $tag"
-          )
-          if (Test-Path $notesFile) {
-            $ghArgs += @("--notes-file", $notesFile)
+          $exists = $false
+          & gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { $exists = $true }
+          if ($exists) {
+            if (Test-Path $notesFile) {
+              & gh release edit $tag --title "Gugu Client $tag" --notes-file $notesFile
+            }
+            & gh release upload $tag "release-artifacts/GuguClient.exe" "release-artifacts/SHA256SUMS.txt" --clobber
           } else {
-            $ghArgs += "--generate-notes"
+            $ghArgs = @(
+              "release", "create", $tag,
+              "release-artifacts/GuguClient.exe",
+              "release-artifacts/SHA256SUMS.txt",
+              "--title", "Gugu Client $tag"
+            )
+            if (Test-Path $notesFile) {
+              $ghArgs += @("--notes-file", $notesFile)
+            } else {
+              $ghArgs += "--generate-notes"
+            }
+            & gh @ghArgs
           }
-          & gh @ghArgs

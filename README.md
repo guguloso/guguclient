@@ -28,6 +28,10 @@
 > [!CAUTION]
 > The official repository [guguloso/guguclient](https://github.com/guguloso/guguclient) is the **ONLY PLACE** where you should download the official Gugu Client executable. Any other source is **NOT** affiliated with us and may pose a potential security threat.
 
+<p align="center">
+    <img src="./.resources/preview.jpg" width="880" alt="Gugu Client preview"/>
+</p>
+
 ---
 
 ## Features
