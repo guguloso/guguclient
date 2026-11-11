@@ -1,38 +1,51 @@
 # Building Gugu Client from Source
 
-Gugu Client ships as a self-extracting portable Windows executable (`GuguClientForRoblox-Portable-<Version>.exe`) with the full Electron runtime, ASAR payload, native libraries, and custom branding embedded.
+Gugu Client is a native Rust application on [Tauri 2](https://tauri.app). It ships as one executable, `GuguClient.exe`, with the UI embedded.
+
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `src-tauri/src/` | Rust backend: IPC router, Roblox API client, launcher services |
+| `src-tauri/scripts/prepare-frontend.mjs` | Copies `ui/renderer` to `dist-tauri/`, generates the `window.api` bridge from `ui/preload/index.js`, writes `docs/rust-port-coverage.md` |
+| `ui/renderer/` | The launcher UI (prebuilt HTML/JS/CSS) |
+| `ui/preload/index.js` | Source of the `window.api` surface the bridge recreates |
 
 ## Prerequisites
-- **OS:** Windows 10 or Windows 11 (x64)
-- **Built-in Windows tools:** `tar.exe` and .NET Framework 4.x compiler (`csc.exe`)
-- **Node.js:** v20+ (for `@electron/asar` packing and `rcedit` resource editing)
 
-## Quick Build (New Release)
+- Windows 10 or 11 (x64)
+- [Rust](https://rustup.rs) stable (MSVC toolchain) and the Visual Studio C++ Build Tools
+- Node.js 20+ (only runs `prepare-frontend.mjs`; no npm packages needed)
 
-To bump the version, repack `resources/app.asar`, update icons & PE metadata (`FileDescription`, `ProductName`, `ProductVersion`), and compile the portable launcher:
-
-```powershell
-.\build\repack_and_build.ps1 -Version 1.0.17
-```
-
-This outputs `GuguClientForRoblox-Portable-1.0.17.exe` in the repository root.
-
-## How the Portable Bootstrapper Works
-
-1. `build/PortableLauncher.cs` compiles into a lightweight Win32 C# bootstrapper with `app.zip` embedded as a managed resource.
-2. On first launch of a version, it extracts the runtime into `%LOCALAPPDATA%\GuguClientForRoblox\portable-<Version>\`.
-3. Older `portable-*` directories from previous versions are automatically cleaned up to save disk space while keeping user settings intact in `%APPDATA%\Gugu Client for Roblox\`.
-4. The launcher passes `GUGU_PORTABLE_EXE` in the environment so the integrated GitHub Auto-Updater can update your portable `.exe` in-place.
-
-Test extraction only without launching:
+## Build
 
 ```powershell
-.\GuguClientForRoblox-Portable-1.0.16.exe --extract-only
+cd src-tauri
+node scripts/prepare-frontend.mjs
+cargo build --release --features custom-protocol
 ```
 
-## Notes on ASAR Integrity Validation
-If modifying `app.asar` on a fresh Electron binary, ensure `EnableEmbeddedAsarIntegrityValidation` is disabled via `@electron/fuses`:
+Output: `src-tauri/target/release/GuguClient.exe`. The `custom-protocol` feature embeds `dist-tauri/` in the binary; without it the app expects a dev server.
+
+On machines with little RAM, add `-j 2` to limit parallel compilation.
+
+## Development
 
 ```powershell
-npx @electron/fuses write --app GuguClient.exe EnableEmbeddedAsarIntegrityValidation=off
+cd src-tauri
+node scripts/prepare-frontend.mjs
+cargo run
 ```
+
+Set `GUGU_DEBUG_PORT=9333` to expose the WebView2 DevTools protocol on that port.
+
+## Tests
+
+```powershell
+cd src-tauri
+cargo test --lib
+```
+
+## Releases and auto-update
+
+The built-in updater reads the latest release of `guguloso/guguclient` on GitHub and downloads the first `.exe` asset whose version is newer than the running one. To publish an update, bump `version` in `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, build, and attach `GuguClient.exe` to a release tagged `v<version>`.

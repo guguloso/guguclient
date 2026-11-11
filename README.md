@@ -56,25 +56,53 @@
 
 ---
 
+## Built with Rust
+
+Gugu Client is a fully native **Rust + [Tauri 2](https://tauri.app)** application — no Electron, no bundled Chromium, no Node.js runtime.
+
+- **Single executable**: one small `GuguClient.exe` with the UI embedded, rendered by the system's WebView2
+- **Native backend**: every launcher feature (accounts, instances, FastFlags, mods, Discord RPC, macros, captures, avatar 3D preview) runs in async Rust on Tokio
+- **Lower footprint**: a fraction of the memory and disk space of the old Electron build
+
+```
+guguclient/
+├── src-tauri/          # Rust backend (Tauri 2)
+│   ├── src/
+│   │   ├── ipc/        # IPC router: one command serves every `window.api` channel
+│   │   ├── roblox/     # Roblox web API client (CSRF, challenges, rate limits)
+│   │   └── services/   # Launcher services: launch, versions, mods, macros, avatar render…
+│   ├── scripts/        # prepare-frontend.mjs: embeds the UI and generates the bridge
+│   └── icons/
+├── ui/                 # Launcher UI (renderer + preload API surface)
+├── docs/               # IPC coverage report
+└── .github/            # CI workflow and issue templates
+```
+
+---
+
 ## Quick Start
 
-1. Download the latest release (`GuguClientForRoblox-Portable-x.x.x.exe`) from the [Releases][repo-releases] page.
-2. Run the executable — it sets up automatically in portable mode with no installer wizard required.
-3. Configure your FastFlags, Mods, or Discord RPC preferences and launch any Roblox game.
+1. Download `GuguClient.exe` from the latest release on the [Releases][repo-releases] page.
+2. Run it — a single native executable, no installer and no extraction step. Accounts, settings and instances live in `%USERPROFILE%\.lunar-for-roblox\`.
+3. Sign in, configure your FastFlags, Mods or Discord RPC preferences and launch any Roblox game.
 
 ### System Requirements
 - **OS:** Windows 10 or Windows 11 (64-bit)
-- **Dependencies:** None (self-contained portable executable)
+- **Runtime:** Microsoft Edge WebView2 (preinstalled on Windows 11 and up-to-date Windows 10)
 
 ---
 
 ## Building from Source
 
+Gugu Client is a native Rust application built on [Tauri 2](https://tauri.app): the backend lives in `src-tauri/`, the UI in `ui/`.
+
 ```powershell
-.\build\repack_and_build.ps1 -Version 1.0.17
+cd src-tauri
+node scripts/prepare-frontend.mjs
+cargo build --release --features custom-protocol
 ```
 
-See [BUILDING.md](./BUILDING.md) for full build instructions.
+The executable is written to `src-tauri/target/release/GuguClient.exe`. See [BUILDING.md](./BUILDING.md) for details.
 
 ---
 

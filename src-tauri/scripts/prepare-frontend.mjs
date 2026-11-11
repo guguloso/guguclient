@@ -1,6 +1,6 @@
 // Prepares the renderer for the Tauri runtime without modifying the original UI.
 //
-// 1. Copies temp_fix/out/renderer -> dist-tauri (same HTML/JS/CSS, byte for byte)
+// 1. Copies ui/renderer -> dist-tauri (same HTML/JS/CSS, byte for byte)
 // 2. Widens the CSP meta tag so Tauri IPC and the thumbnail protocol are allowed
 // 3. Generates src-tauri/generated/bridge.js from the Electron preload, so
 //    `window.api` keeps the exact same namespaces, methods and read cache;
@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tauriDir = path.resolve(here, "..");
 const repo = path.resolve(tauriDir, "..");
-const rendererSrc = path.join(repo, "temp_fix", "out", "renderer");
-const preloadSrc = path.join(repo, "temp_fix", "out", "preload", "index.js");
+const rendererSrc = path.join(repo, "ui", "renderer");
+const preloadSrc = path.join(repo, "ui", "preload", "index.js");
 const dist = path.join(repo, "dist-tauri");
 const generatedDir = path.join(tauriDir, "generated");
 

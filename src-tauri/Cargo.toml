@@ -1,6 +1,6 @@
 [package]
 name = "gugu-client"
-version = "1.0.16"
+version = "1.1.0"
 description = "Gugu Client for Roblox — native Rust runtime (Tauri)"
 authors = ["guguloso"]
 edition = "2021"
@@ -10,6 +10,11 @@ rust-version = "1.80"
 # The `_lib` suffix avoids a name clash with the binary on Windows (cargo#8519).
 name = "gugu_client_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+# The updater and single-instance logic look for `GuguClient.exe`.
+name = "GuguClient"
+path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -72,10 +77,16 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_Time",
 ] }
 
+[features]
+# Serve the embedded UI (dist-tauri) instead of a dev server; release builds
+# pass `--features custom-protocol` (what `tauri build` does).
+custom-protocol = ["tauri/custom-protocol"]
+
 [profile.release]
 opt-level = 3
-lto = "fat"
-codegen-units = 1
+# Thin LTO: fat LTO with one codegen unit exhausts memory on 8 GB machines.
+lto = "thin"
+codegen-units = 16
 panic = "abort"
 strip = true
 
