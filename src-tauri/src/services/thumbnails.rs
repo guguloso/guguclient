@@ -131,12 +131,16 @@ impl IdQuery<'_> {
 const RETRYABLE_STATES: [&str; 3] = ["Pending", "InReview", "TemporarilyUnavailable"];
 const MAX_RETRIES: usize = 3;
 const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+/// `THUMBNAIL_CACHE_STALE_MS`: id-based entries older than this are
+/// re-resolved, so a friend's new avatar shows up.
+const STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(30 * 60);
 
 pub struct ThumbnailService {
     roblox: Arc<RobloxClient>,
     urls: Mutex<LruCache<String, String>>,
-    /// id-based cache: key -> remote URL (mapped to the local protocol on read).
-    ids: Mutex<LruCache<String, String>>,
+    /// id-based cache: key -> (remote URL, resolved at). Mapped to the local
+    /// protocol on read.
+    ids: Mutex<LruCache<String, (String, std::time::Instant)>>,
     disk_dir: PathBuf,
 }
 
@@ -153,6 +157,9 @@ impl ThumbnailService {
 
     /// Port of `ThumbnailCacheService.batchFetch`: serves cached ids, fetches
     /// the rest and retries ids still rendering (`Pending`, ...) up to 3 times.
+    /// Entries older than [`STALE_AFTER`] are re-resolved in the same request
+    /// (single attempt, like `refreshStale`); the cached URL stays as the
+    /// answer when the refresh fails or the new render is not ready.
     /// Returns `{ "<id>": "<local url>" }` like `Object.fromEntries(map)`.
     pub async fn batch_by_id<F, Fut>(
         &self,
@@ -166,12 +173,17 @@ impl ThumbnailService {
     {
         let mut result = std::collections::BTreeMap::new();
         let mut pending = Vec::new();
+        let mut stale = std::collections::HashSet::new();
         {
             let mut cache = self.ids.lock();
             for id in endpoints::unique_positive(ids) {
                 match cache.get(&query.key(id)) {
-                    Some(url) => {
+                    Some((url, resolved_at)) => {
                         result.insert(id.to_string(), to_local_url(url));
+                        if resolved_at.elapsed() > STALE_AFTER {
+                            stale.insert(id);
+                            pending.push(id);
+                        }
                     }
                     None => pending.push(id),
                 }
@@ -198,9 +210,10 @@ impl ThumbnailService {
                 match (entry.state.as_deref(), entry.image_url) {
                     (Some("Completed"), Some(url)) => {
                         result.insert(target.to_string(), to_local_url(&url));
-                        cache.put(query.key(target), url);
+                        cache.put(query.key(target), (url, std::time::Instant::now()));
                     }
-                    (Some(state), _) if RETRYABLE_STATES.contains(&state) => pending.push(target),
+                    // Stale ids already have an answer: no render retries.
+                    (Some(state), _) if RETRYABLE_STATES.contains(&state) && !stale.contains(&target) => pending.push(target),
                     _ => {}
                 }
             }
@@ -285,6 +298,43 @@ impl ThumbnailService {
             responses[index] = Value::Object(entry);
         }
         Ok(responses)
+    }
+
+    /// Cached `AvatarHeadShot` entries resolved more than `age` ago, grouped
+    /// by `(size, includeProfileFrame)`, with the remote URL each one had.
+    pub fn headshots_older_than(&self, age: std::time::Duration) -> Vec<(String, bool, Vec<(u64, String)>)> {
+        let mut groups: Vec<(String, bool, Vec<(u64, String)>)> = Vec::new();
+        for (key, (url, resolved_at)) in self.ids.lock().iter() {
+            if resolved_at.elapsed() <= age {
+                continue;
+            }
+            // `AvatarHeadShot:<id>:<size>:Png:<frame|noframe>`
+            let parts: Vec<&str> = key.split(':').collect();
+            let [kind, id, size, _format, frame] = parts[..] else { continue };
+            let Ok(id) = id.parse::<u64>() else { continue };
+            if kind != "AvatarHeadShot" || frame.is_empty() {
+                continue;
+            }
+            let frame = frame == "frame";
+            match groups.iter_mut().find(|(s, f, _)| s == size && *f == frame) {
+                Some((_, _, entries)) => entries.push((id, url.clone())),
+                None => groups.push((size.to_owned(), frame, vec![(id, url.clone())])),
+            }
+        }
+        groups
+    }
+
+    /// Marks cached id-based entries stale so the next `batch_by_id`
+    /// re-resolves them.
+    pub fn expire(&self, kind: &str, ids: &[u64], query_size: &str, format: &str, frame: Option<bool>) {
+        let query = IdQuery { kind, size: query_size, format, include_profile_frame: frame };
+        let long_ago = std::time::Instant::now().checked_sub(STALE_AFTER + std::time::Duration::from_secs(1));
+        let mut cache = self.ids.lock();
+        for id in ids {
+            if let (Some(entry), Some(at)) = (cache.get_mut(&query.key(*id)), long_ago) {
+                entry.1 = at;
+            }
+        }
     }
 
     /// `deleteFramedTarget`: drops cached framed headshots of one target.
@@ -522,5 +572,39 @@ mod tests {
         assert!(persisted.starts_with("lbx-thumb://image/?src="));
         assert_eq!(from_persisted_url(&persisted), local);
         assert_eq!(sniff_content_type(&[0x89, b'P', b'N', b'G']), "image/png");
+    }
+}
+
+#[cfg(test)]
+mod stale_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn stale_headshots_are_refetched() {
+        let service = ThumbnailService::new(Arc::new(RobloxClient::new().unwrap()), std::env::temp_dir());
+        let query = IdQuery { kind: "AvatarHeadShot", size: "150x150", format: "Png", include_profile_frame: Some(true) };
+        let fetched = Mutex::new(Vec::new());
+        let fetch = |url: &'static str| {
+            let fetched = &fetched;
+            move |ids: Vec<u64>| {
+                fetched.lock().push(ids.clone());
+                async move {
+                    Ok(ids.into_iter().map(|id| ThumbEntry { target_id: Some(id), state: Some("Completed".into()), image_url: Some(url.into()) }).collect())
+                }
+            }
+        };
+        service.batch_by_id(&[7], &query, fetch("https://t.rbxcdn.com/old")).await.unwrap();
+        // Fresh entry: served from cache, no request.
+        let cached = service.batch_by_id(&[7], &query, fetch("https://t.rbxcdn.com/new")).await.unwrap();
+        assert_eq!(fetched.lock().len(), 1);
+        assert_eq!(cached["7"], to_local_url("https://t.rbxcdn.com/old"));
+        assert!(service.headshots_older_than(std::time::Duration::from_secs(60)).is_empty());
+        // Expired entry: re-resolved, the new avatar comes back.
+        service.expire("AvatarHeadShot", &[7], "150x150", "Png", Some(true));
+        let groups = service.headshots_older_than(std::time::Duration::from_secs(60));
+        assert_eq!(groups, vec![("150x150".to_owned(), true, vec![(7, "https://t.rbxcdn.com/old".to_owned())])]);
+        let fresh = service.batch_by_id(&[7], &query, fetch("https://t.rbxcdn.com/new")).await.unwrap();
+        assert_eq!(fetched.lock().len(), 2);
+        assert_eq!(fresh["7"], to_local_url("https://t.rbxcdn.com/new"));
     }
 }

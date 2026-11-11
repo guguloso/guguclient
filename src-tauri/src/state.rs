@@ -164,6 +164,7 @@ impl AppState {
             crate::services::metadata::MetadataService::initialize(&state);
             crate::services::chat::ChatPoller::start(&state);
             crate::services::social::SocialService::start(&state);
+            crate::services::auth::AuthService::start_headshot_refresh(&state);
             crate::services::mission_control::sync_hotkey(&state);
             crate::services::captures::start(&state);
             crate::services::macros::start(&state);

@@ -27,6 +27,8 @@ const ACTIVE_ACCOUNT_CHANGED: &str = "auth:activeAccountChanged";
 const FAVORITE_GAMES_TTL: Duration = Duration::from_secs(10 * 60);
 const PRESENCE_BATCH: usize = 100;
 const HEADSHOT_BATCH: usize = 100;
+/// How often cached headshots are re-checked for avatar changes.
+const HEADSHOT_REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5 * 60);
 const BROWSER_TRACKER_FIELD: &str = "browserTrackerId";
 
 /// `RBXEventTrackerV2=CreateDate=...&rbxid=...&browserid=<id>` → `<id>`.
@@ -820,6 +822,32 @@ impl AuthService {
                 Ok(pages.into_iter().flat_map(|p| p.data).collect())
             })
             .await
+    }
+
+    /// Keeps on-screen avatars current: every few minutes, cached headshots
+    /// are re-resolved and `auth:headshotChanged` fires for each user whose
+    /// image changed, which makes the renderer refetch it (the friends list
+    /// stays mounted and never asks again on its own).
+    pub fn start_headshot_refresh(state: &Arc<crate::state::AppState>) {
+        let state = Arc::clone(state);
+        tauri::async_runtime::spawn(async move {
+            let mut tick = tokio::time::interval(HEADSHOT_REFRESH_INTERVAL);
+            tick.tick().await;
+            loop {
+                tick.tick().await;
+                for (size, frame, entries) in state.thumbnails.headshots_older_than(HEADSHOT_REFRESH_INTERVAL) {
+                    let ids: Vec<u64> = entries.iter().map(|(id, _)| *id).collect();
+                    state.thumbnails.expire("AvatarHeadShot", &ids, &size, "Png", Some(frame));
+                    let Ok(fresh) = state.auth.headshots(&state.thumbnails, &ids, &size, frame).await else { continue };
+                    for (id, old) in entries {
+                        let changed = fresh.get(&id.to_string()).is_some_and(|new| *new != crate::services::thumbnails::to_local_url(&old));
+                        if changed {
+                            state.events.emit("auth:headshotChanged", serde_json::json!({ "userId": id }));
+                        }
+                    }
+                }
+            }
+        });
     }
 
     async fn favorite_games(&self, user_id: u64) -> AppResult<Arc<[FavoriteGame]>> {
