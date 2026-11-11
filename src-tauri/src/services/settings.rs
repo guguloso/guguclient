@@ -158,7 +158,6 @@ fn same_kind(value: &Value, default: &Value) -> bool {
 fn after_set(state: &Arc<AppState>, id: &str, value: &Value, previous: &Value) {
     let changed = value != previous;
     match id {
-        "allow-analytics-collection" if changed => sync_analytics_opt_out(value.as_bool().unwrap_or(true)),
         "auto-check-updates" => crate::services::version_maintenance::start_stop_background_updates(state),
         "disable-roblox-startup" => {
             if value.as_bool() == Some(false) && previous.as_bool() == Some(true) {
@@ -185,17 +184,6 @@ fn after_set(state: &Arc<AppState>, id: &str, value: &Value, previous: &Value) {
             }
         }
         _ => {}
-    }
-}
-
-/// `syncAnalyticsOptOutMarker` with the age gate still pending: only an
-/// opt-out writes the uninstaller's marker.
-fn sync_analytics_opt_out(enabled: bool) {
-    if enabled {
-        return;
-    }
-    if let Err(error) = crate::services::registry::set(crate::services::protocol::APP_REGISTRY_KEY, Some("AnalyticsOptOut"), "REG_SZ", "1") {
-        tracing::warn!("[Analytics] Could not sync the uninstall opt-out marker: {error}");
     }
 }
 

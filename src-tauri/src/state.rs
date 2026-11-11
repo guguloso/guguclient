@@ -14,7 +14,6 @@ use crate::ipc::EventBus;
 use crate::paths::LauncherPaths;
 use crate::roblox::RobloxClient;
 use crate::services::agreements::UserAgreementsService;
-use crate::services::analytics::AnalyticsQueue;
 use crate::services::auth::AuthService;
 use crate::services::cache::CacheService;
 use crate::services::discovery::DiscoveryState;
@@ -38,7 +37,6 @@ pub struct AppState {
     pub thumbnails: ThumbnailService,
     pub user_search: UserSearchState,
     pub discovery: DiscoveryState,
-    pub analytics: AnalyticsQueue,
     pub social: SocialService,
     pub metadata: MetadataService,
     pub updater: UpdaterService,
@@ -97,7 +95,6 @@ impl AppState {
             ),
             user_search: UserSearchState::default(),
             discovery: DiscoveryState::default(),
-            analytics: AnalyticsQueue::default(),
             social: SocialService::new(&paths)?,
             metadata: MetadataService::new()?,
             updater: UpdaterService::new(),
@@ -142,12 +139,8 @@ impl AppState {
         self.app.try_state::<Arc<AppState>>().map(|s| s.inner().clone())
     }
 
-    /// `analyticsService.track`: queued only when collection is allowed.
-    pub fn track(&self, event: &str, payload: Value) {
-        if self.settings.get_bool("allow-analytics-collection") {
-            self.analytics.push(event.to_owned(), payload);
-        }
-    }
+    /// Analytics collection is disabled; kept as a no-op for existing call sites.
+    pub fn track(&self, _event: &str, _payload: Value) {}
 
     /// Background services, in the Electron boot order (after auth).
     /// Agreements subscribe first so the restored session refreshes them,

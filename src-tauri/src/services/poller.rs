@@ -40,6 +40,8 @@ struct Control {
     background: Option<Ladder>,
     backgrounded: bool,
     triggered_at: Instant,
+    last_run_at: Option<Instant>,
+    in_flight: bool,
     consecutive_errors: u32,
 }
 
@@ -80,6 +82,8 @@ impl Poller {
                 background,
                 backgrounded: false,
                 triggered_at: Instant::now(),
+                last_run_at: None,
+                in_flight: false,
                 consecutive_errors: 0,
             }),
             wake: Notify::new(),
@@ -127,7 +131,26 @@ impl Poller {
     }
 
     pub fn set_backgrounded(&self, value: bool) {
-        self.control.lock().backgrounded = value;
+        let mut control = self.control.lock();
+        if control.backgrounded && !value {
+            control.triggered_at = Instant::now();
+        }
+        control.backgrounded = value;
+    }
+
+    /// Triggers a refresh only if not currently running and `min_age` has passed
+    /// since the last completed run.
+    pub fn trigger_if_stale(&self, min_age: Duration) {
+        if self.task.lock().is_none() {
+            return;
+        }
+        let should_trigger = {
+            let control = self.control.lock();
+            !control.in_flight && control.last_run_at.is_none_or(|t| t.elapsed() >= min_age)
+        };
+        if should_trigger {
+            self.trigger();
+        }
     }
 
     /// Replaces the ladders without resetting the trigger timestamp.
@@ -155,15 +178,18 @@ impl Poller {
     async fn run_loop<J: PollJob>(self: Arc<Self>, job: Arc<J>) {
         loop {
             if job.should_run() {
-                match job.run().await {
-                    Ok(()) => self.control.lock().consecutive_errors = 0,
-                    Err(error) => {
-                        let attempt = {
-                            let mut control = self.control.lock();
+                self.control.lock().in_flight = true;
+                let result = job.run().await;
+                {
+                    let mut control = self.control.lock();
+                    control.in_flight = false;
+                    control.last_run_at = Some(Instant::now());
+                    match result {
+                        Ok(()) => control.consecutive_errors = 0,
+                        Err(error) => {
                             control.consecutive_errors += 1;
-                            control.consecutive_errors
-                        };
-                        tracing::warn!(poller = self.name, attempt, %error, "[Poller] run failed");
+                            tracing::warn!(poller = self.name, attempt = control.consecutive_errors, %error, "[Poller] run failed");
+                        }
                     }
                 }
             }

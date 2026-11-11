@@ -29,7 +29,6 @@ use crate::util::{now_iso, now_millis};
 
 const PRESENCE_TYPE_OFFLINE: u64 = 0;
 const PRESENCE_TYPE_IN_GAME: u64 = 2;
-const OFFLINE_TICK_RATIO: u64 = 6;
 const AVATAR_HEADSHOT_SIZE: &str = "150x150";
 const CACHE_STORE_NAME: &str = "social-cache";
 const CACHE_WRITE_DEBOUNCE: Duration = Duration::from_millis(1_000);
@@ -37,23 +36,23 @@ const CACHE_WRITE_DEBOUNCE: Duration = Duration::from_millis(1_000);
 const FRIENDS_LADDER: Ladder = &[
     Tier {
         interval_ms: 30_000,
-        duration_ms: 60_000,
+        duration_ms: 120_000,
     },
     Tier {
-        interval_ms: 300_000,
+        interval_ms: 60_000,
         duration_ms: FOREVER,
     },
 ];
 const FRIENDS_BACKGROUND_LADDER: Ladder = &[Tier {
-    interval_ms: 600_000,
+    interval_ms: 300_000,
     duration_ms: FOREVER,
 }];
 const PRESENCE_LADDER: Ladder = &[Tier {
-    interval_ms: 30_000,
+    interval_ms: 15_000,
     duration_ms: FOREVER,
 }];
 const PRESENCE_BACKGROUND_LADDER: Ladder = &[Tier {
-    interval_ms: 180_000,
+    interval_ms: 90_000,
     duration_ms: FOREVER,
 }];
 
@@ -204,7 +203,6 @@ struct SocialData {
     /// Signatures of the last broadcast lists (`areFriendListsEqual`).
     last_broadcast_friends: Option<Vec<String>>,
     last_broadcast_requests: Option<Vec<String>>,
-    presence_tick: u64,
 }
 
 pub struct SocialService {
@@ -253,10 +251,6 @@ fn user_id_of(v: &Value) -> Option<u64> {
 
 fn presence_type(v: &Value) -> Option<u64> {
     v.get("userPresenceType").and_then(Value::as_u64)
-}
-
-fn is_online(presence: Option<&Value>) -> bool {
-    presence.is_some_and(|p| presence_type(p) != Some(PRESENCE_TYPE_OFFLINE))
 }
 
 const PRESENCE_DIFF_FIELDS: [&str; 7] = [
@@ -421,9 +415,16 @@ impl SocialService {
         self.presence_poller.set_backgrounded(backgrounded);
     }
 
-    /// Boosts the friends poller after a user-driven mutation.
+    /// Boosts the friends and presence pollers after a user-driven mutation.
     pub fn on_user_acted(&self) {
         self.friends_poller.trigger();
+        self.presence_poller.trigger();
+    }
+
+    /// Refreshes friends and presence when returning to the window if stale.
+    pub fn refresh_if_stale(&self, min_age: Duration) {
+        self.friends_poller.trigger_if_stale(min_age);
+        self.presence_poller.trigger_if_stale(min_age);
     }
 
     fn hydrate(&self, user_id: Option<u64>) {
@@ -552,7 +553,9 @@ fn handle_friends_result(
             avatars_changed = true;
         }
     }
-    let mut presence_changed = false;
+    let previous_ids: HashSet<u64> = previous.iter().copied().collect();
+    let has_new_friend = incoming.iter().any(|id| !previous_ids.contains(id));
+    let mut presence_changed = has_new_friend;
     for id in previous {
         if !incoming.contains(&id) && data.presence.remove(&id).is_some() {
             presence_changed = true;
@@ -601,25 +604,19 @@ impl PollJob for PresenceJob {
         let Some(state) = self.0.upgrade() else {
             return Ok(());
         };
-        let ids = {
-            let mut data = state.social.data.lock();
+        let ids: Vec<u64> = {
+            let data = state.social.data.lock();
             if data.friends.is_empty() {
                 return Ok(());
             }
-            let all: Vec<u64> = data
-                .friends
+            // Poll every friend on each cycle (batched by 100 on Roblox's
+            // presence endpoint) so offline friends coming online or joining a
+            // game appear on the very next tick instead of waiting multiple
+            // cycles.
+            data.friends
                 .iter()
                 .filter_map(|f| f.get("id").and_then(Value::as_u64))
-                .collect();
-            let include_offline = data.presence_tick % OFFLINE_TICK_RATIO == 0;
-            data.presence_tick += 1;
-            if include_offline {
-                all
-            } else {
-                all.into_iter()
-                    .filter(|id| is_online(data.presence.get(id)))
-                    .collect()
-            }
+                .collect()
         };
         if ids.is_empty() {
             return Ok(());

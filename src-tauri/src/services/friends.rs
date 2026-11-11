@@ -290,6 +290,7 @@ async fn post_action(state: &AppState, path: String, body: Option<Value>) -> App
         None => state.roblox.post_empty::<Value>(&url).await?,
     };
     tracing::info!(%path, "friends action ok");
+    state.social.on_user_acted();
     Ok(())
 }
 

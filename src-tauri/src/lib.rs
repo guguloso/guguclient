@@ -215,6 +215,9 @@ fn attach_window_events(window: &WebviewWindow, state: Arc<AppState>) {
         }
         WindowEvent::Focused(true) => {
             update_backgrounded(&handle, &state);
+            state
+                .social
+                .refresh_if_stale(std::time::Duration::from_secs(10));
             services::updater::UpdaterService::on_window_focus(&state);
         }
         WindowEvent::CloseRequested { api, .. } => {

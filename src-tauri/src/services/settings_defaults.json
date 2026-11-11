@@ -37,7 +37,7 @@
   "open-on-startup": true,
   "open-second-screen-on-launch": true,
   "use-dev-services": false,
-  "allow-analytics-collection": true,
+  "allow-analytics-collection": false,
   "ads-optimization": true,
   "show-item-values": true,
   "launcher-resolution-main": { "width": 1400, "height": 800, "maximized": false, "fullscreen": false },

@@ -58,7 +58,7 @@
 
 ## Built with Rust
 
-Gugu Client is a native **Rust + [Tauri 2](https://tauri.app)** application — no Electron, no bundled Chromium, no Node.js runtime.
+Gugu Client is a fork of **Lunar for Roblox**, rebuilt with a native **Rust + [Tauri 2](https://tauri.app)** backend and actively maintained with constant updates — no Electron, no bundled Chromium, no Node.js runtime.
 
 - **Single executable**: one ~22 MB `GuguClient.exe` with the UI embedded, rendered by the system's WebView2
 - **Native backend**: accounts, instances, FastFlags, mods, Discord RPC, macros, captures and the avatar renderer all run in async Rust on Tokio
